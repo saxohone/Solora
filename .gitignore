@@ -7,3 +7,10 @@ data/
 
 # Node.js dependencies (standalone server)
 server/node_modules/
+node_modules/
+
+# Local diagnostics and editor backups
+*.bak
+*.pre-waituntil-fix
+mf_test.mjs
+ua_test.mjs

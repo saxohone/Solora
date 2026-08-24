@@ -3918,11 +3918,17 @@ function updateCurrentSongInfo(song, options = {}) {
     if (song.pic_id || song.picUrl) {
         cancelDeferredPaletteUpdate();
         dom.albumCover.classList.add("loading");
-        const picUrl = API.getPicUrl(song);
+        const directPicUrl = typeof song.picUrl === "string" && song.picUrl.startsWith("http")
+            ? preferHttpsUrl(song.picUrl)
+            : null;
+        const artworkRequest = directPicUrl
+            ? Promise.resolve(directPicUrl)
+            : API.fetchJson(API.getPicUrl(song)).then(data =>
+                data && typeof data === "object" ? data.url : data
+            );
 
-        API.fetchJson(picUrl)
-            .then(data => {
-                const resolvedUrl=(data&&typeof data==="object"&&data.url)?data.url:picUrl;
+        artworkRequest
+            .then(resolvedUrl => {
                 if (!resolvedUrl || !resolvedUrl.startsWith("http")) {
                     throw new Error("封面地址缺失");
                 }

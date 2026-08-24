@@ -17,8 +17,9 @@ write_var() {
 
 echo "Configuring environment variables for wrangler..."
 
-# 登录密码（_middleware.ts 读取 env.PASSWORD）
-write_var "PASSWORD" "$PASSWORD"
+# 登录密码：小写 password 是主变量名，PASSWORD 保留向后兼容
+_PASSWORD_VALUE="${password:-${_PASSWORD_VALUE:-}}"
+write_var "PASSWORD" "$_PASSWORD_VALUE"
 
 # 音乐 API 地址（functions/proxy.ts 读取 env.API_BASE_URL，未配置时 fallback 到默认节点）
 write_var "API_BASE_URL" "$API_BASE_URL"
@@ -38,7 +39,7 @@ echo "  🌟 Solara  (Cloudflare Pages + Wrangler local dev)"
 echo "  ────────────────────────────────────────────────────"
 echo "  Port      : 8787"
 echo "  Data dir  : /data"
-echo "  Password  : ${PASSWORD:+configured}${PASSWORD:-not set (open access)}"
+echo "  Password  : ${_PASSWORD_VALUE:+configured}${_PASSWORD_VALUE:-not set (open access)}"
 echo "  API URL   : ${API_BASE_URL:-https://music-api.gdstudio.xyz/api.php (default)}"
 echo "  Language  : ${_LANG_VALUE:-ZH (default)}"
 echo "  ────────────────────────────────────────────────────"

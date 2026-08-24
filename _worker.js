@@ -312,9 +312,16 @@ async function proxyOnRequest({ request, waitUntil, env }) {
 
 // ================= login =================
 const MAX_AGE_SECONDS = 48 * 60 * 60;
+function getConfiguredPassword(env) {
+  if (!env) return null;
+  const lower = env.password;
+  if (typeof lower === "string" && lower.length > 0) return lower;
+  const value = env.PASSWORD;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
 async function loginOnRequestPost(context) {
   const { request, env } = context;
-  const passwordEnv = env && env.PASSWORD;
+  const passwordEnv = getConfiguredPassword(env);
   const url = new URL(request.url);
   const body = await request.json().catch(() => ({}));
   const providedPassword = typeof body.password === "string" ? body.password : "";
@@ -424,7 +431,7 @@ function hasPublicExt(pathname) {
 }
 function isPublicPath(pathname) { return PUBLIC_PATH_PATTERNS.some(p => p.test(pathname)) || hasPublicExt(pathname); }
 function authResponse(request, env, url) {
-  const password = env && env.PASSWORD;
+  const password = getConfiguredPassword(env);
   if (typeof password !== "string" || password.length === 0) return null;
   const pathname = url.pathname;
   if (isPublicPath(pathname)) return null;
@@ -443,6 +450,11 @@ export default {
     if (request.method === "OPTIONS") {
       return handleOptions();
     }
+    if (pathname === "/api/login" && request.method === "POST") {
+      return loginOnRequestPost({ request, env });
+    }
+    const authRes = authResponse(request, env, url);
+    if (authRes) return authRes;
     if (pathname === "/proxy" || pathname.startsWith("/proxy")) {
       try {
         return await proxyOnRequest({ request, waitUntil: (promise) => ctx.waitUntil(promise), env });
@@ -452,17 +464,12 @@ export default {
         return new Response(msg, { status: 500, headers: { "Content-Type": "text/plain", "Access-Control-Allow-Origin": "*" } });
       }
     }
-    if (pathname === "/api/login" && request.method === "POST") {
-      return loginOnRequestPost({ request, env });
-    }
     if (pathname === "/api/storage" || pathname.startsWith("/api/storage")) {
       return storageOnRequest({ request, env });
     }
     if (pathname === "/palette" || pathname.startsWith("/palette")) {
       return new Response(JSON.stringify({ error: "palette endpoint not bundled in worker" }), { status: 501, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     }
-    const authRes = authResponse(request, env, url);
-    if (authRes) return authRes;
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
       return env.ASSETS.fetch(request);
     }

@@ -1,0 +1,26 @@
+{
+  "name": "solara",
+  "version": "1.0.0",
+  "description": "> 🌐 现代化网页音乐播放器（forked & customized）：整合多种音乐聚合接口，支持自定义音乐 API，覆盖搜索、播放、封面与音频下载全流程，可部署于 Cloudflare Pages 或私有服务器。",
+  "main": "_worker.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check public/js/index.js && node --check server/index.js && sh -n docker-entrypoint.sh && wrangler deploy --dry-run --outdir /tmp/solara-worker-dry-run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saxohone/Solora.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/saxohone/Solora/issues"
+  },
+  "homepage": "https://github.com/saxohone/Solora#readme",
+  "devDependencies": {
+    "miniflare": "^4.20260730.0",
+    "wrangler": "^4.125.0"
+  }
+}

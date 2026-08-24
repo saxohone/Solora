@@ -26,7 +26,7 @@ const createPaletteRouter   = require('./routes/palette');
 
 const PORT     = parseInt(process.env.PORT  || '8787', 10);
 const HOST     = process.env.HOST || '0.0.0.0';
-const PASSWORD = process.env.PASSWORD || null;
+const PASSWORD = process.env.password || process.env.PASSWORD || null;
 const ROOT_DIR = path.join(__dirname, '..', 'public');  // 前端静态资源目录
 
 const app = express();
