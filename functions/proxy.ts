@@ -1,198 +1,170 @@
-const DEFAULT_API_BASE_URL = "https://music-api.gdstudio.xyz/api.php";
-const KUWO_HOST_PATTERN = /(^|\.)kuwo\.cn$/i;
-const SAFE_RESPONSE_HEADERS = ["content-type", "cache-control", "accept-ranges", "content-length", "content-range", "etag", "last-modified", "expires"];
+# Solara API Proxy
+// ChKSz API Adapter
 
-function createCorsHeaders(init?: Headers): Headers {
-  const headers = new Headers();
-  if (init) {
-    for (const [key, value] of init.entries()) {
-      if (SAFE_RESPONSE_HEADERS.includes(key.toLowerCase())) {
-        headers.set(key, value);
-      }
-    }
+// Token
+[[REDACTED]]; // ChKSz apikey
+
+// Type alias using index signature (no Record<str
+
+// Utility: validate response
+function isValidJsonResponse(text) {
+  if (!text || text.trim().length < 1) return false;
+  if (text.indexOf(code) > -1 && (text.indexOf(msg) > -1 || text.indexOf(data) > -1)) {
+    try { var p = JSON.parse(text); return typeof p.code === "number" && p.code !== 401 && p.code !== 403; }
+    catch(e) { return true; }
   }
-  if (!headers.has("Cache-Control")) {
-    headers.set("Cache-Control", "no-store");
+  return true;
+}
+
+// CORS headers
+function createCorsHeaders(init) {
+  var h = new Headers();
+  if (init) { for (var kv of init.entries()) {
+    var a = ["content","cache","accept","content","content","etag","last","expires"];
+    var k = kv[0].toLowerCase();
+    for (var i=0;i<a.length;i++) { if (k.indexOf(a[i]) > -1) { h.set(kv[0], kv[1]); break; } }
+  }}
+  if (!h.has("Cache-Control")) h.set("Cache-Control","no-store");
+  h.set("Access-Control-Allow-Origin","*");
+  return h;
+}
+
+function handleOptions() {
+  return new Response(null, { status: 204, headers: {
+    "Access-Control-Allow-Origin":"*", "Access-Control-Allow-Methods":"GET,HEAD,OPTIONS",
+    "Access-Control-Allow-Headers":"Content-Type, Authorization", "Access-Control-Max-Age":"86400"
+  }});
+}
+
+// Audio quality mapping
+function mapBrToLevel(br) {
+  var m = {}; m["128"]="standard"; m["192"]="higher"; m["320"]="exhigh";
+  m["640"]="lossless"; m["999"]="hires"; return m[br] || "exhigh";
+}
+
+// Build ChKSz API URL from Solara params
+function buildChKSzUrl(params) {
+  var types = params.get("types");
+  var ep = "/api/163_search";
+  if (types === "url") ep = "/api/163_music";
+  else if (types === "lyric") ep = "/api/163_lyric";
+  else if (types === "pic") ep = "/api/163_pic";
+  var url = new URL("https://api.chksz.com" + ep);
+  url.searchParams.set("apikey", [[REDACTED]]]]);
+
+  if (types === "search") {
+    url.searchParams.set("keyword", params.get("name") || params.get("keyword") || "");
+    url.searchParams.set("page", params.get("pages") || "1");
+    url.searchParams.set("limit", params.get("count") || "20");
+    var src = params.get("source") || "netease";
+    var st = "163";
+    if (src === "qq") st = "qq";
+    else if (src === "kugou") st = "kg";
+    url.searchParams.set("type", st);
+  } else if (types === "url") {
+    url.searchParams.set("id", params.get("id") || "");
+    url.searchParams.set("level", mapBrToLevel(params.get("br") || "320"));
+  } else if (types === "lyric") {
+    url.searchParams.set("id", params.get("id") || params.get("lyric_id") || "");
+  } else if (types === "pic") {
+    url.searchParams.set("id", params.get("id") || "");
+    url.searchParams.set("size", params.get("size") || "300");
   }
-  headers.set("Access-Control-Allow-Origin", "*");
-  return headers;
+  return { url: url.toString(), isSearch: types === "search" };
 }
 
-function handleOptions(): Response {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
-      "Access-Control-Allow-Headers": "*",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
-}
-
-function isAllowedKuwoHost(hostname: string): boolean {
-  if (!hostname) return false;
-  return KUWO_HOST_PATTERN.test(hostname);
-}
-
-function normalizeKuwoUrl(rawUrl: string): URL | null {
+// Unwrap {code, msg, data} from ChKSz
+function unwrapChKSzResponse(text, isSearch) {
   try {
-    const parsed = new URL(rawUrl);
-    if (!isAllowedKuwoHost(parsed.hostname)) {
-      return null;
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    parsed.protocol = "http:";
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-async function proxyKuwoAudio(targetUrl: string, request: Request): Promise<Response> {
-  const normalized = normalizeKuwoUrl(targetUrl);
-  if (!normalized) {
-    return new Response("Invalid target", { status: 400 });
-  }
-
-  const init: RequestInit = {
-    method: request.method,
-    headers: {
-      "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
-      "Referer": "https://www.kuwo.cn/",
-    },
-  };
-
-  const rangeHeader = request.headers.get("Range");
-  if (rangeHeader) {
-    (init.headers as Record<string, string>)["Range"] = rangeHeader;
-  }
-
-  const upstream = await fetch(normalized.toString(), init);
-  const headers = createCorsHeaders(upstream.headers);
-  if (!headers.has("Cache-Control")) {
-    headers.set("Cache-Control", "public, max-age=3600");
-  }
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers,
-  });
-}
-
-async function proxyApiRequest(url: URL, request: Request, waitUntil?: (promise: Promise<any>) => void, apiBaseUrl: string = DEFAULT_API_BASE_URL): Promise<Response> {
-  const cache = caches.default;
-  
-  // 构建缓存 Key（过滤掉随机签名 s 以及强制刷新标记 nocache，以便重试成功后能更新同一个缓存项）
-  const cacheUrl = new URL(url.toString());
-  cacheUrl.searchParams.delete("s");
-  cacheUrl.searchParams.delete("nocache");
-  
-  const cacheKey = new Request(cacheUrl.toString(), {
-    method: request.method,
-    headers: request.headers
-  });
-
-  // 如果是 GET 请求且未指定 nocache 强制刷新，尝试命中缓存
-  const bypassCache = url.searchParams.get("nocache") === "true";
-  if (request.method === "GET" && !bypassCache) {
-    try {
-      const cachedResponse = await cache.match(cacheKey);
-      if (cachedResponse) {
-        console.log(`[Cache HIT] ${url.toString()}`);
-        const response = new Response(cachedResponse.body, cachedResponse);
-        response.headers.set("X-Cache-Status", "HIT");
-        response.headers.set("Access-Control-Expose-Headers", "X-Cache-Status");
-        return response;
+    var p = JSON.parse(text);
+    if (typeof p === "object" && p !== null && Object.prototype.hasOwnProperty.call(p, "code")) {
+      if (p.code === 200 || p.code === 0) {
+        if (isSearch && Array.isArray(p.data)) return JSON.stringify(p.data);
+        var d = p.data !== undefined ? p.data : p;
+        return JSON.stringify(d);
       }
-    } catch (err) {
-      console.warn(`[Cache ERROR] ${url.toString()}`, err);
+      return JSON.stringify({ error: p.msg || String(p.code), code: p.code });
     }
-  }
-
-  console.log(`[Cache MISS] Fetching from upstream: ${url.toString()}`);
-
-  const apiUrl = new URL(apiBaseUrl);
-  url.searchParams.forEach((value, key) => {
-    if (key === "target" || key === "callback" || key === "s" || key === "nocache") {
-      return;
-    }
-    apiUrl.searchParams.set(key, value);
-  });
-
-  if (!apiUrl.searchParams.has("types")) {
-    return new Response("Missing types", { status: 400 });
-  }
-
-  const upstream = await fetch(apiUrl.toString(), {
-    headers: {
-      "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
-      "Accept": "application/json",
-    },
-  });
-
-  const responseText = await upstream.text();
-  const headers = createCorsHeaders(upstream.headers);
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json; charset=utf-8");
-  }
-
-  headers.set("X-Cache-Status", "MISS");
-  headers.set("Access-Control-Expose-Headers", "X-Cache-Status");
-
-  // 判断是否应该缓存：必须是 200 状态，且内容不能是空数组或包含错误标识，且未指定强制刷新
-  const isSearch = url.searchParams.get("types") === "search";
-  const isEmptyResult = responseText.trim() === "[]";
-  const isError = responseText.includes('"error"') || responseText.includes('"status":0');
-  
-  let shouldCache = upstream.status === 200 && request.method === "GET" && !isError && !bypassCache;
-  
-  // 如果是搜索请求且结果为空，通常是 API 繁忙或异常，不建议长缓存
-  if (isSearch && isEmptyResult) {
-    shouldCache = false;
-  }
-
-  if (shouldCache) {
-    headers.set("Cache-Control", "public, s-maxage=300, max-age=300");
-  } else {
-    headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  }
-
-  const response = new Response(responseText, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers,
-  });
-
-  // 写入缓存（不阻塞主流程）
-  if (shouldCache && waitUntil) {
-    waitUntil(cache.put(cacheKey, response.clone()));
-    console.log(`[Cache PUT] Saved to cache: ${url.toString()}`);
-  }
-
-  return response;
+  } catch(e) {}
+  return text;
 }
 
-export async function onRequest({ request, waitUntil, env }: { request: Request, waitUntil: (promise: Promise<any>) => void, env: any }): Promise<Response> {
-  // 优先使用环境变量中配置的 API 地址，CF 部署未设置时 fallback 到默认节点
-  const apiBaseUrl = (typeof env?.API_BASE_URL === "string" && env.API_BASE_URL) ? env.API_BASE_URL : DEFAULT_API_BASE_URL;
-  if (request.method === "OPTIONS") {
-    return handleOptions();
+// Proxy Kuwo audio stream
+async function proxyKuwoAudio(target, request) {
+  try { new URL(target); } catch(e) { return new Response("Invalid target",{status:400}); }
+  var init = { method: request.method, headers: {
+    "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+    "Referer": "https://www.kuwo.cn/" } };
+  var r = request.headers.get("Range");
+  if (r) init.headers["Range"] = r;
+  var up = await fetch(target, init);
+  var h = createCorsHeaders(up.headers);
+  if (!h.has("Cache-Control")) h.set("Cache-Control","public, max-age=3600");
+  return new Response(up.body, { status: up.status, statusText: up.statusText, headers: h });
+}
+
+// Main API proxy with cache
+async function proxyApiRequest(url, request, waitUntil) {
+  var cache = caches.default;
+  var built = buildChKSzUrl(url.searchParams);
+  var czUrl = built.url;
+  var isSearch = built.isSearch;
+  var ck = new URL(czUrl);
+  ck.searchParams.delete("apikey");
+  ck.searchParams.delete("s");
+  ck.searchParams.delete("nocache");
+  var cacheKey = new Request(ck.toString(), request);
+  var bypass = url.searchParams.get("nocache") === "true";
+
+  if (!bypass) {
+    var cached = await cache.match(cacheKey);
+    if (cached) {
+      console.log("[Cache HIT] " + czUrl);
+      return new Response(cached.body, { status: 200, headers: new Headers({
+        "Content-Type": (cached.headers && cached.headers.get("content-type")) || "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=300",
+        "X-Cache-Status": "HIT"
+      })});
+    }
   }
 
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return new Response("Method not allowed", { status: 405 });
+  console.log("[Cache MISS] " + czUrl);
+  var upstream;
+  try {
+    upstream = await fetch(czUrl, { headers: {
+      "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+      "Accept": "application/json"
+    }});
+  } catch(e) {
+    console.error("[ChKSz fetch error]", e);
+    return new Response(JSON.stringify({error:"upstream error"}),{
+      status:502, headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*"}});
   }
-
-  const url = new URL(request.url);
-  const target = url.searchParams.get("target");
-
-  if (target) {
-    return proxyKuwoAudio(target, request);
+  var raw = await upstream.text();
+  var emptyResult = isSearch && raw.trim() === "[]";
+  var apiErr = !isValidJsonResponse(raw);
+  var shouldCache = upstream.status === 200 && !apiErr && !bypass && !emptyResult;
+  var unwrapped = unwrapChKSzResponse(raw, isSearch);
+  var outH = new Headers({
+    "Content-Type": (upstream.headers && upstream.headers.get("content-type")) || "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Cache-Control": shouldCache ? "public, max-age=300" : "no-store",
+    "X-Cache-Status": "MISS"
+  });
+  if (shouldCache && waitUntil) {
+    waitUntil(cache.put(cacheKey, new Response(unwrapped,{headers:{"Content-Type":"application/json"}})));
+    console.log("[Cache PUT] " + czUrl);
   }
+  return new Response(unwrapped, { status: upstream.status, statusText: upstream.statusText, headers: outH });
+}
 
-  return proxyApiRequest(url, request, waitUntil, apiBaseUrl);
+// Entry point
+export async function onRequest({request, waitUntil, env}) {
+  if (request.method === "OPTIONS") return handleOptions();
+  if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed",{status:405});
+  var url = new URL(request.url);
+  var target = url.searchParams.get("target");
+  if (target) return proxyKuwoAudio(target, request);
+  return proxyApiRequest(url, request, waitUntil);
 }

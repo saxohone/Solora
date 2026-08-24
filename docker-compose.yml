@@ -18,7 +18,7 @@ services:
       # 当默认节点被你的服务器 IP 封锁时，可替换为以下备用地址：
       #   https://music-api-cn.gdstudio.xyz/api.php  （国内节点）
       #   https://music-api-hk.gdstudio.xyz/api.php  （香港节点）
-      - API_BASE_URL=https://music-api.gdstudio.xyz/api.php
+      - API_BASE_URL=https://api.chksz.com
 
       # ── 可选：界面语言（默认中文，填 ENG 切换为英文）─────────────────────
       # - language=ENG

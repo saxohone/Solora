@@ -826,9 +826,10 @@ const API = {
             return data.map(song => ({
                 id: song.id,
                 name: song.name,
-                artist: song.artist,
+                artist: song.artist || song.artists || "未知艺术家",
                 album: song.album,
                 pic_id: song.pic_id,
+                picUrl: song.picUrl,
                 url_id: song.url_id,
                 lyric_id: song.lyric_id,
                 source: song.source,
@@ -903,6 +904,9 @@ const API = {
     },
 
     getPicUrl: (song) => {
+        if (song.picUrl && song.picUrl.startsWith("http")) {
+            return song.picUrl;
+        }
         const signature = API.generateSignature();
         return `${API.baseUrl}?types=pic&id=${song.pic_id}&source=${song.source || "netease"}&size=300&s=${signature}`;
     }
@@ -3856,19 +3860,20 @@ function updateCurrentSongInfo(song, options = {}) {
     }
 
     // 加载封面
-    if (song.pic_id) {
+    if (song.pic_id || song.picUrl) {
         cancelDeferredPaletteUpdate();
         dom.albumCover.classList.add("loading");
         const picUrl = API.getPicUrl(song);
 
         API.fetchJson(picUrl)
             .then(data => {
-                if (!data || !data.url) {
+                const resolvedUrl=(data&&typeof data==="object"&&data.url)?data.url:picUrl;
+                if (!resolvedUrl || !resolvedUrl.startsWith("http")) {
                     throw new Error("封面地址缺失");
                 }
 
                 const img = new Image();
-                const imageUrl = preferHttpsUrl(data.url);
+                const imageUrl = preferHttpsUrl(resolvedUrl);
                 const absoluteImageUrl = toAbsoluteUrl(imageUrl);
                 if (state.currentSong === song) {
                     state.currentArtworkUrl = absoluteImageUrl;
