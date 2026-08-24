@@ -2,11 +2,6 @@
 
 > 🌐 现代化网页音乐播放器（forked & customized）：整合多种音乐聚合接口，支持自定义音乐 API，覆盖搜索、播放、封面与音频下载全流程，可部署于 Cloudflare Pages 或私有服务器。
 
-![Review-ezgif com-optimize](https://github.com/user-attachments/assets/487157de-bf71-4bc9-9e49-16a4f0a14472)
-| | | |
-|:--:|:--:|:--:|
-| <img src="https://github.com/user-attachments/assets/7fcfd485-bcd4-46f9-887a-0a972dce3be3" height="700"/> | <img src="https://github.com/user-attachments/assets/bb092569-0a7f-47f6-b7e9-c07ea56949cf" height="700"/> | <img src="https://github.com/user-attachments/assets/02b830e3-292f-4880-91f2-86ec818b877a" height="700"/> |
-
 
 ## 🧭 关于本项目
 本项目为开源播放器 Solara 的二次开发定制版（fork），针对个人使用习惯进行了改造：
