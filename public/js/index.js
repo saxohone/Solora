@@ -959,11 +959,9 @@ const API = {
     },
 
     getPicUrl: (song) => {
-        if (song.picUrl && song.picUrl.startsWith("http")) {
-            return song.picUrl;
-        }
         const signature = API.generateSignature();
-        return `${API.baseUrl}?types=pic&id=${song.pic_id}&source=${song.source || "netease"}&size=300&s=${signature}`;
+        const picId = song.pic_id || song.id;
+        return `${API.baseUrl}?types=pic&id=${picId}&source=${song.source || "netease"}&size=300&s=${signature}`;
     }
 };
 
@@ -3915,26 +3913,38 @@ function updateCurrentSongInfo(song, options = {}) {
     }
 
     // 加载封面
-    if (song.pic_id || song.picUrl) {
+    if (song.pic_id || song.picUrl || song.id) {
         cancelDeferredPaletteUpdate();
         dom.albumCover.classList.add("loading");
         const directPicUrl = typeof song.picUrl === "string" && song.picUrl.startsWith("http")
             ? preferHttpsUrl(song.picUrl)
             : null;
+        const loadImage = resolvedUrl => new Promise((resolve, reject) => {
+            if (!resolvedUrl || !resolvedUrl.startsWith("http")) {
+                reject(new Error("封面地址缺失"));
+                return;
+            }
+
+            const imageUrl = preferHttpsUrl(resolvedUrl);
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => resolve(imageUrl);
+            img.onerror = () => reject(new Error("封面图片加载失败: " + imageUrl));
+            img.src = imageUrl;
+        });
+        const loadProxyArtwork = () => API.fetchJson(API.getPicUrl(song)).then(data =>
+            loadImage(data && typeof data === "object" ? data.url : data)
+        );
         const artworkRequest = directPicUrl
-            ? Promise.resolve(directPicUrl)
-            : API.fetchJson(API.getPicUrl(song)).then(data =>
-                data && typeof data === "object" ? data.url : data
-            );
+            ? loadImage(directPicUrl).catch(error => {
+                console.warn("封面直链加载失败，尝试站点代理", error);
+                return loadProxyArtwork();
+            })
+            : loadProxyArtwork();
 
         artworkRequest
-            .then(resolvedUrl => {
-                if (!resolvedUrl || !resolvedUrl.startsWith("http")) {
-                    throw new Error("封面地址缺失");
-                }
-
+            .then(imageUrl => {
                 const img = new Image();
-                const imageUrl = preferHttpsUrl(resolvedUrl);
                 const absoluteImageUrl = toAbsoluteUrl(imageUrl);
                 if (state.currentSong === song) {
                     state.currentArtworkUrl = absoluteImageUrl;
@@ -3942,7 +3952,6 @@ function updateCurrentSongInfo(song, options = {}) {
                         window.__SOLARA_UPDATE_MEDIA_METADATA();
                     }
                 }
-                img.crossOrigin = "anonymous";
                 img.onload = () => {
                     if (state.currentSong !== song) {
                         return;
@@ -5659,6 +5668,10 @@ async function playSong(song, options = {}) {
             throw new Error('无法获取音频播放地址');
         }
 
+        if (!song.picUrl && typeof audioData.cover === "string" && audioData.cover.startsWith("http")) {
+            song.picUrl = audioData.cover;
+        }
+
         const originalAudioUrl = audioData.url;
         const proxiedAudioUrl = buildAudioProxyUrl(originalAudioUrl);
         const preferredAudioUrl = preferHttpsUrl(originalAudioUrl);
@@ -6108,6 +6121,7 @@ async function exploreOnlineMusic() {
             source: song.source || source,
             lyric_id: song.lyric_id || song.id,
             pic_id: song.pic_id || song.pic || "",
+            picUrl: song.picUrl || "",
             url_id: song.url_id,
         }));
 
@@ -6120,6 +6134,13 @@ async function exploreOnlineMusic() {
         for (const song of normalizedSongs) {
             const key = getSongKey(song);
             if (key && existingKeys.has(key)) {
+                const existingSong = existingSongs.find((item) => getSongKey(item) === key);
+                if (existingSong && !existingSong.picUrl && song.picUrl) {
+                    existingSong.picUrl = song.picUrl;
+                }
+                if (existingSong && !existingSong.pic_id && song.pic_id) {
+                    existingSong.pic_id = song.pic_id;
+                }
                 continue;
             }
             appendedSongs.push(song);
