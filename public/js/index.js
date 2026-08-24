@@ -3297,7 +3297,7 @@ if (!("mediaSession" in navigator)) {
 
 function setupInteractions() {
     function ensureQualityMenuPortal() {
-        if (!dom.playerQualityMenu || !document.body || !isMobileView) {
+        if (!dom.playerQualityMenu || !document.body) {
             return;
         }
         const currentParent = dom.playerQualityMenu.parentElement;
