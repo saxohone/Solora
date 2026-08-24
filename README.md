@@ -1,6 +1,6 @@
 # 🎶 Solara（光域）
 
-> 🌐 由轻量后端服务支撑的现代化网页音乐播放器，整合多种音乐聚合接口，覆盖搜索、播放与音频下载全流程。
+> 🌐 现代化网页音乐播放器（forked & customized）：整合多种音乐聚合接口，支持自定义音乐 API，覆盖搜索、播放、封面与音频下载全流程，可部署于 Cloudflare Pages 或私有服务器。
 
 ![Review-ezgif com-optimize](https://github.com/user-attachments/assets/487157de-bf71-4bc9-9e49-16a4f0a14472)
 | | | |
@@ -8,10 +8,14 @@
 | <img src="https://github.com/user-attachments/assets/7fcfd485-bcd4-46f9-887a-0a972dce3be3" height="700"/> | <img src="https://github.com/user-attachments/assets/bb092569-0a7f-47f6-b7e9-c07ea56949cf" height="700"/> | <img src="https://github.com/user-attachments/assets/02b830e3-292f-4880-91f2-86ec818b877a" height="700"/> |
 
 
-## 🤝 参与贡献
-感谢 GD音乐台(music.gdstudio.xyz)提供的免费API
+## 🧭 关于本项目
+本项目为开源播放器 Solara 的二次开发定制版（fork），针对个人使用习惯进行了改造：
 
-感谢 来自Linux.do 牛就是牛@ufoo 大佬 https://linux.do/t/topic/942415 提供的灵感
+- ✍️ 自定义音乐 API：可在设置面板中配置 API 地址、Key 与默认音源
+- 🎨 界面美化：渐变背景、毛玻璃、卡片动效（enhance.css）
+- ⚡ 响应优化：封面缓存、骨架屏加载、切换动效
+
+原版项目地址与许可信息见文末「许可证」章节。
 
 
 ## 🌟 主要特性
@@ -47,7 +51,8 @@
 ```yaml
 services:
   solara:
-    image: ghcr.io/akudamatata/solara:latest
+    build: .            # 改为本地构建，不再使用原作者镜像
+    image: solara:local
     container_name: solara
     restart: always
     init: true # 解决容器停止时 Node/Wrangler 进程无法优雅响应 SIGTERM 导致卡顿的问题
