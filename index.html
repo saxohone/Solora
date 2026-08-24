@@ -32,6 +32,11 @@
                 desktopLink.href = "css/desktop.css";
                 desktopLink.id = "desktopStylesheet";
                 document.head.appendChild(desktopLink);
+                const redesignLinkDesktop = document.createElement("link");
+                redesignLinkDesktop.rel = "stylesheet";
+                redesignLinkDesktop.href = "css/redesign.css";
+                redesignLinkDesktop.id = "redesignStylesheet";
+                document.head.appendChild(redesignLinkDesktop);
                 return;
             }
             document.documentElement.classList.add("mobile-view");
@@ -40,6 +45,11 @@
             link.href = "css/mobile.css";
             link.id = "mobileStylesheet";
             document.head.appendChild(link);
+            const redesignLinkMobile = document.createElement("link");
+            redesignLinkMobile.rel = "stylesheet";
+            redesignLinkMobile.href = "css/redesign.css";
+            redesignLinkMobile.id = "redesignStylesheet";
+            document.head.appendChild(redesignLinkMobile);
             const setViewportUnit = () => {
                 const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
                 document.documentElement.style.setProperty("--mobile-vh", `${viewportHeight}px`);
@@ -527,14 +537,14 @@
         </div>
             <section class="settings-section api-config-section">
                 <h3>音乐 API</h3>
-                <p class="settings-hint">自定义音乐接口地址与密钥（留空使用默认 /proxy 服务端配置）</p>
+                <p class="settings-hint">自定义音乐接口地址（高级选项，一般无需修改）</p>
                 <div class="api-config-row">
                     <label for="apiBaseUrlInput">API 地址</label>
                     <input type="text" id="apiBaseUrlInput" class="api-config-input" placeholder="/proxy 或 https://api.example.com/api.php" autocomplete="off" spellcheck="false">
                 </div>
-                <div class="api-config-row">
-                    <label for="apiKeyInput">API Key（可选）</label>
-                    <input type="password" id="apiKeyInput" class="api-config-input" placeholder="留空则使用服务端默认" autocomplete="off">
+                <div class="api-config-hint">
+                    <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                    <div>密钥（<code>API_KEY</code>）在 Cloudflare 环境变量中配置，站点前端不保存密钥，更安全。留空「API 地址」时，站点默认通过服务端 <code>/proxy</code> 请求音乐接口。</div>
                 </div>
                 <div class="api-config-row">
                     <label for="apiSourceSelect">默认音源</label>

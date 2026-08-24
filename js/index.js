@@ -6467,10 +6467,8 @@ function openSettingsModal() {
     if (dom.settingsModal) {
         const apiCfg = getApiConfig();
         const apiBaseEl = document.getElementById("apiBaseUrlInput");
-        const apiKeyEl = document.getElementById("apiKeyInput");
         const apiSourceEl = document.getElementById("apiSourceSelect");
         if (apiBaseEl) apiBaseEl.value = apiCfg.baseUrl || "";
-        if (apiKeyEl) apiKeyEl.value = apiCfg.apiKey || "";
         if (apiSourceEl) apiSourceEl.value = apiCfg.defaultSource || "netease";
         dom.settingsModal.classList.add("show");
         dom.settingsModal.setAttribute("aria-hidden", "false");
@@ -6508,11 +6506,10 @@ async function saveSettings() {
 
     // 保存自定义音乐 API 配置
     const apiBaseEl = document.getElementById("apiBaseUrlInput");
-    const apiKeyEl = document.getElementById("apiKeyInput");
     const apiSourceEl = document.getElementById("apiSourceSelect");
     saveApiConfig({
         baseUrl: (apiBaseEl && apiBaseEl.value.trim()) || "",
-        apiKey: (apiKeyEl && apiKeyEl.value.trim()) || "",
+        apiKey: "", // 密钥由服务端环境变量管理，前端不再保存
         defaultSource: (apiSourceEl && apiSourceEl.value) || "netease"
     });
 
