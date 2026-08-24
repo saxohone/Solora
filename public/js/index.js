@@ -1810,12 +1810,6 @@ function applyDynamicGradient(options = {}) {
             targetGradient = gradientInfo.gradient;
         }
 
-        if (palette.tokens) {
-            const tokens = palette.tokens[gradientMode] || palette.tokens[mode];
-            if (tokens) {
-                applyThemeTokens(tokens);
-            }
-        }
     }
 
     setDocumentGradient(targetGradient, options);
@@ -3488,6 +3482,7 @@ function setupInteractions() {
             captureThemeDefaults();
         }
         document.body.classList.toggle("dark-mode", isDark);
+        document.documentElement.classList.toggle("dark-mode", isDark);
         dom.themeToggleButton.classList.toggle("is-dark", isDark);
         const label = isDark ? "切换为浅色模式" : "切换为深色模式";
         dom.themeToggleButton.setAttribute("aria-label", label);
