@@ -231,7 +231,7 @@ async function proxyApiRequest(url, request, waitUntil, env) {
 }
 
 // Entry point
-export async function onRequest({ request, waitUntil, env }) {
+async function proxyOnRequest({ request, waitUntil, env }) {
   if (request.method === "OPTIONS") return handleOptions();
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", { status: 405 });
@@ -239,3 +239,157 @@ export async function onRequest({ request, waitUntil, env }) {
   var url = new URL(request.url);
   return proxyApiRequest(url, request, waitUntil, env);
 }
+
+// ================= login =================
+const MAX_AGE_SECONDS = 48 * 60 * 60;
+async function loginOnRequestPost(context) {
+  const { request, env } = context;
+  const passwordEnv = env && env.PASSWORD;
+  const url = new URL(request.url);
+  const body = await request.json().catch(() => ({}));
+  const providedPassword = typeof body.password === "string" ? body.password : "";
+  if (typeof passwordEnv !== "string" || passwordEnv.length === 0) {
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  if (providedPassword === passwordEnv) {
+    const cookieSegments = ["auth=" + btoa(passwordEnv), "Max-Age=" + MAX_AGE_SECONDS, "Path=/", "SameSite=Lax", "HttpOnly"];
+    if (url.protocol === "https:") cookieSegments.push("Secure");
+    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json", "Set-Cookie": cookieSegments.join("; ") } });
+  }
+  return new Response(JSON.stringify({ success: false }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+}
+
+// ================= storage (D1) =================
+const FAVORITE_KEYS = new Set(["favoriteSongs", "currentFavoriteIndex", "favoritePlayMode", "favoritePlaybackTime"]);
+function storageTableForKey(key) {
+  return FAVORITE_KEYS.has(key) ? "favorites_store" : "playback_store";
+}
+function storageJson(body, status) {
+  return new Response(JSON.stringify(body), { status: status || 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Content-Type" } });
+}
+function storageHasDb(env) {
+  return Boolean(env && env.DB && typeof env.DB.prepare === "function");
+}
+async function storageEnsureTables(env) {
+  if (!storageHasDb(env)) return;
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS playback_store (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS favorites_store (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+  ]);
+}
+async function storageGet(request, env) {
+  if (!storageHasDb(env)) return storageJson({ d1Available: false, data: {} });
+  const url = new URL(request.url);
+  if (url.searchParams.get("status")) return storageJson({ d1Available: true });
+  await storageEnsureTables(env);
+  const keys = (url.searchParams.get("keys") || "").split(",").map(k => k.trim()).filter(Boolean);
+  const data = {};
+  keys.forEach(k => { data[k] = null; });
+  let rows = [];
+  if (keys.length > 0) {
+    const grouped = {};
+    keys.forEach(k => { const t = storageTableForKey(k); (grouped[t] = grouped[t] || []).push(k); });
+    for (const t of Object.keys(grouped)) {
+      const ks = grouped[t];
+      const placeholders = ks.map(() => "?").join(",");
+      const res = await env.DB.prepare("SELECT key, value FROM " + t + " WHERE key IN (" + placeholders + ")").bind(...ks).all();
+      rows = rows.concat((res && (res.results || [])) || []);
+    }
+  } else {
+    const r1 = await env.DB.prepare("SELECT key, value FROM playback_store").all();
+    const r2 = await env.DB.prepare("SELECT key, value FROM favorites_store").all();
+    rows = rows.concat(r1.results || [], r2.results || []);
+  }
+  rows.forEach(row => { if (row && typeof row.key === "string") data[row.key] = row.value; });
+  return storageJson({ d1Available: true, data });
+}
+async function storagePost(request, env) {
+  if (!storageHasDb(env)) return storageJson({ d1Available: false, data: {} });
+  const body = await request.json().catch(() => ({}));
+  const payload = body.data && typeof body.data === "object" && !Array.isArray(body.data) ? body.data : null;
+  if (!payload) return storageJson({ error: "Invalid payload" }, 400);
+  const entries = Object.entries(payload).filter(([k]) => Boolean(k));
+  if (entries.length === 0) return storageJson({ d1Available: true, updated: 0 });
+  await storageEnsureTables(env);
+  const grouped = {};
+  for (const [k, v] of entries) {
+    const t = storageTableForKey(k);
+    (grouped[t] = grouped[t] || []).push(env.DB.prepare("INSERT INTO " + t + " (key, value, updated_at) VALUES (?1, ?2, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(k, v == null ? "" : String(v)));
+  }
+  const batches = [];
+  for (const t of Object.keys(grouped)) batches.push(env.DB.batch(grouped[t]));
+  await Promise.all(batches);
+  return storageJson({ d1Available: true, updated: entries.length });
+}
+async function storageDel(request, env) {
+  if (!storageHasDb(env)) return storageJson({ d1Available: false });
+  const body = await request.json().catch(() => ({}));
+  const keys = Array.isArray(body.keys) ? body.keys.filter(k => typeof k === "string" && Boolean(k)) : [];
+  if (keys.length === 0) return storageJson({ d1Available: true, deleted: 0 });
+  await storageEnsureTables(env);
+  const grouped = {};
+  keys.forEach(k => { const t = storageTableForKey(k); (grouped[t] = grouped[t] || []).push(env.DB.prepare("DELETE FROM " + t + " WHERE key = ?1").bind(k)); });
+  const batches = [];
+  for (const t of Object.keys(grouped)) batches.push(env.DB.batch(grouped[t]));
+  await Promise.all(batches);
+  return storageJson({ d1Available: true, deleted: keys.length });
+}
+async function storageOnRequest(context) {
+  const { request, env } = context;
+  const m = (request.method || "GET").toUpperCase();
+  if (m === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Content-Type" } });
+  if (m === "GET") return storageGet(request, env);
+  if (m === "POST") return storagePost(request, env);
+  if (m === "DELETE") return storageDel(request, env);
+  return storageJson({ error: "Method not allowed" }, 405);
+}
+
+// ================= auth =================
+const PUBLIC_PATH_PATTERNS = [/^\/login(?:\/|$)/, /^\/api\/login(?:\/|$)/];
+const PUBLIC_FILE_EXTENSIONS = new Set([".css",".js",".png",".svg",".jpg",".jpeg",".gif",".webp",".ico",".txt",".map",".json",".woff",".woff2"]);
+function hasPublicExt(pathname) {
+  const i = pathname.lastIndexOf(".");
+  if (i === -1) return false;
+  return PUBLIC_FILE_EXTENSIONS.has(pathname.slice(i).toLowerCase());
+}
+function isPublicPath(pathname) { return PUBLIC_PATH_PATTERNS.some(p => p.test(pathname)) || hasPublicExt(pathname); }
+function authResponse(request, env, url) {
+  const password = env && env.PASSWORD;
+  if (typeof password !== "string" || password.length === 0) return null;
+  const pathname = url.pathname;
+  if (isPublicPath(pathname)) return null;
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookies = {};
+  cookieHeader.split(";").forEach(part => { const idx = part.indexOf("="); if (idx === -1) return; const k = part.slice(0, idx).trim(); const v = part.slice(idx + 1).trim(); if (k) cookies[k] = v; });
+  if (cookies.auth && cookies.auth === btoa(password)) return null;
+  return Response.redirect(new URL("/login", url).toString(), 302);
+}
+
+// ================= entry =================
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    if (request.method === "OPTIONS") {
+      return handleOptions();
+    }
+    if (pathname === "/proxy" || pathname.startsWith("/proxy")) {
+      return proxyOnRequest({ request, waitUntil: ctx.waitUntil, env });
+    }
+    if (pathname === "/api/login" && request.method === "POST") {
+      return loginOnRequestPost({ request, env });
+    }
+    if (pathname === "/api/storage" || pathname.startsWith("/api/storage")) {
+      return storageOnRequest({ request, env });
+    }
+    if (pathname === "/palette" || pathname.startsWith("/palette")) {
+      return new Response(JSON.stringify({ error: "palette endpoint not bundled in worker" }), { status: 501, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+    const authRes = authResponse(request, env, url);
+    if (authRes) return authRes;
+    if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
+      return env.ASSETS.fetch(request);
+    }
+    return new Response("Not found", { status: 404 });
+  }
+};

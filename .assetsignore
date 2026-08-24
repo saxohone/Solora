@@ -1,0 +1,13 @@
+_worker.js
+functions/
+.git/
+.github/
+data/
+server/
+Dockerfile
+docker-compose.yml
+docker-entrypoint.sh
+.dockerignore
+.gitignore
+README.md
+Preview.gif
