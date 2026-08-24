@@ -2,15 +2,14 @@
     const translations = {
         // common
         "网易云音乐": "Netease Music",
-        "酷我音乐": "Kuwo Music",
-        "JOOX音乐": "JOOX Music",
-        "哔哩哔哩": "Bilibili",
+        "QQ音乐": "QQ Music",
+        "酷狗音乐": "Kugou Music",
         "极高音质": "High Quality",
         "标准音质": "Standard Quality",
         "高品音质": "High Quality",
         "无损音质": "Lossless",
         "歌词将在此处同步显示": "Lyrics will be displayed here synchronously",
-        "Made by Wet Dream Boy，免费API来自GD音乐台(music.gdstudio.xyz)，仅供学习交流使用，请支持正版音乐奥！": "Made by Wet Dream Boy. Free API from GD Music (music.gdstudio.xyz). For educational purposes only, please support official releases!",
+        "音乐服务由 ChKSz API 提供，仅供个人学习与交流，请支持正版音乐。": "Music services are provided by ChKSz API for personal study and communication only. Please support official releases.",
 
         // index.html
         "探索雷达": "Explore Radar",

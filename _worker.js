@@ -27,95 +27,101 @@ function handleOptions() {
   }});
 }
 
-// Solara br -> ChKSz level (163_music)
+// Solara quality values -> provider-native quality values
 function mapBrToLevel(br) {
-  var m = {};
-  m["128"] = "standard";
-  m["192"] = "exhigh";
-  m["320"] = "exhigh";
-  m["640"] = "lossless";
-  m["999"] = "hires";
+  var m = { "128": "standard", "192": "exhigh", "320": "exhigh", "640": "lossless", "999": "lossless" };
   return m[br] || "exhigh";
 }
 
-// Build ChKSz request from Solara /proxy params (per chksz docs)
+function mapProviderSize(br) {
+  var m = { "128": "128k", "192": "320k", "320": "320k", "640": "flac", "999": "flac" };
+  return m[br] || "flac";
+}
+
+function normalizeProvider(source) {
+  return source === "qq" || source === "kugou" ? source : "netease";
+}
+
+// Build a ChKSz request from Solara's legacy /proxy parameters.
 function buildChKSzUrl(params, env) {
   var base = (env && env.API_BASE_URL && String(env.API_BASE_URL).trim())
     ? String(env.API_BASE_URL).trim().replace(/\/+$/, "")
     : "https://api.chksz.com";
   var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (params.get("apikey") || "");
   var types = params.get("types") || "search";
-  var source = params.get("source") || "netease";
+  var source = normalizeProvider(params.get("source") || "netease");
+  var id = params.get("id") || "";
+  var br = params.get("br") || "320";
   var u;
 
   if (types === "search") {
     var kw = params.get("name") || params.get("keyword") || "";
-    var count = params.get("count") || "20";
-    var page = parseInt(params.get("pages") || "1", 10) || 1;
-    var offset = Math.max(0, (page - 1) * parseInt(count, 10));
+    var count = Math.max(1, Math.min(50, parseInt(params.get("count") || "20", 10) || 20));
+    var page = Math.max(1, parseInt(params.get("pages") || "1", 10) || 1);
+    var offset = (page - 1) * count;
     if (source === "qq") {
       u = new URL(base + "/api/qq_music");
       u.searchParams.set("msg", kw);
-      u.searchParams.set("num", count);
+      u.searchParams.set("num", String(count));
     } else if (source === "kugou") {
       u = new URL(base + "/api/kugou_music");
       u.searchParams.set("msg", kw);
-      u.searchParams.set("n", count);
+      u.searchParams.set("num", String(count));
     } else {
       u = new URL(base + "/api/163_search");
       u.searchParams.set("keyword", kw);
-      u.searchParams.set("limit", count);
+      u.searchParams.set("limit", String(count));
       u.searchParams.set("offset", String(offset));
     }
-  } else if (types === "url") {
-    var id = params.get("id") || "";
-    var level = mapBrToLevel(params.get("br") || "320");
+  } else if (types === "playlist") {
+    if (source !== "netease") throw new Error("歌单读取目前仅支持网易云音乐");
+    u = new URL(base + "/api/163_playlist");
+    u.searchParams.set("id", id);
+  } else if (types === "url" || types === "lyric" || types === "pic") {
     if (source === "qq") {
-      // QQ resolves by mid directly as fallback; docs also allow msg+n
       u = new URL(base + "/api/qq_music");
       u.searchParams.set("mid", id);
-      u.searchParams.set("size", level);
+      u.searchParams.set("size", mapProviderSize(br));
     } else if (source === "kugou") {
       u = new URL(base + "/api/kugou_music");
       u.searchParams.set("id", id);
-      u.searchParams.set("size", mapKugouSize(params.get("br") || "320"));
+      u.searchParams.set("size", mapProviderSize(br));
+    } else if (types === "lyric") {
+      u = new URL(base + "/api/163_lyric");
+      u.searchParams.set("id", id || params.get("lyric_id") || "");
     } else {
       u = new URL(base + "/api/163_music");
       u.searchParams.set("id", id);
-      u.searchParams.set("level", level);
+      u.searchParams.set("level", types === "pic" ? "standard" : mapBrToLevel(br));
       u.searchParams.set("type", "json");
     }
-  } else if (types === "lyric") {
-    u = new URL(base + "/api/163_lyric");
-    u.searchParams.set("id", params.get("id") || params.get("lyric_id") || "");
-  } else if (types === "pic") {
-    u = new URL(base + "/api/163_music");
-    u.searchParams.set("id", params.get("id") || "");
-    u.searchParams.set("level", "standard");
-    u.searchParams.set("type", "json");
+  } else {
+    throw new Error("不支持的代理类型: " + types);
   }
 
   if (key) u.searchParams.set("apikey", key);
-  return { url: u.toString(), isSearch: types === "search", pix: types === "pic" };
+  return { url: u.toString(), kind: types, source: source };
 }
 
-function mapKugouSize(br) {
-  var m = {};
-  m["128"] = "128k";
-  m["192"] = "320k";
-  m["320"] = "320k";
-  m["640"] = "flac";
-  m["999"] = "hires";
-  return m[br] || "flac";
+function artistText(value) {
+  if (Array.isArray(value)) {
+    return value.map(function (x) { return x && typeof x === "object" ? (x.name || x.singer || "") : String(x || ""); }).filter(Boolean).join(" / ");
+  }
+  if (value && typeof value === "object") return value.name || value.singer || "";
+  return value ? String(value) : "";
 }
 
-// Normalize ChKSz JSON into what Solara front-end expects
-function normalizeJson(text, kind) {
+function albumText(value) {
+  if (value && typeof value === "object") return value.name || value.albumName || "";
+  return value ? String(value) : "";
+}
+
+// Normalize ChKSz JSON into the legacy shape consumed by Solara.
+function normalizeJson(text, kind, source) {
   var parsed;
   try { parsed = JSON.parse(text); } catch (e) { return text; }
   if (!parsed || typeof parsed !== "object") return JSON.stringify(parsed);
 
-  // ChKSz envelopes: {code,msg,data} or {code,msg,list}
   var payload = parsed;
   if (typeof parsed.code === "number" && parsed.code !== 200 && parsed.code !== 0) {
     return JSON.stringify({ error: parsed.msg || ("ChKSz error " + parsed.code), code: parsed.code });
@@ -124,48 +130,77 @@ function normalizeJson(text, kind) {
   else if (Array.isArray(parsed.list)) payload = parsed.list;
 
   if (kind === "search") {
-    // search expects an array of songs
     var arr = Array.isArray(payload) ? payload
       : (payload && Array.isArray(payload.songs)) ? payload.songs
       : (payload && Array.isArray(payload.list)) ? payload.list
       : [];
-    var out = arr.map(function (it) {
+    return JSON.stringify(arr.map(function (it) {
       var obj = (it && typeof it === "object") ? it : {};
-      var mid = obj.mid || obj.id || "";
+      var songId = obj.id || obj.mid || obj.songmid || "";
+      var artist = artistText(obj.singer || obj.artist || obj.artists || obj.author) || "未知艺术家";
       return {
-        id: String(obj.id || obj.mid || obj.songmid || ""),
+        id: String(songId),
         name: obj.name || obj.title || obj.songname || obj.songName || "",
-        artist: obj.singer || obj.artist || obj.artists || obj.author || (obj.artists && obj.artists[0] && obj.artists[0].name) || "未知艺术家",
-        album: obj.album || obj.albumname || obj.albumName || "",
-        pic_id: String(obj.id || mid),
+        artist: artist,
+        album: albumText(obj.album || obj.albumname || obj.albumName),
+        pic_id: String(songId),
         picUrl: obj.cover || obj.pic || obj.picUrl || obj.albm || "",
-        url_id: String(obj.id || mid),
-        lyric_id: String(obj.id || mid)
+        url_id: String(songId),
+        lyric_id: String(songId),
+        source: source
       };
-    });
-    return JSON.stringify(out);
+    }));
+  }
+
+  if (kind === "playlist") {
+    var playlist = payload && payload.playlist ? payload.playlist : payload;
+    var tracks = playlist && (playlist.tracks || playlist.songs || playlist.list);
+    if (!Array.isArray(tracks)) tracks = [];
+    return JSON.stringify({ playlist: {
+      name: playlist && playlist.name || "",
+      coverImgUrl: playlist && (playlist.coverImgUrl || playlist.cover || playlist.picUrl) || "",
+      trackCount: playlist && (playlist.trackCount || playlist.total) || tracks.length,
+      tracks: tracks.map(function (track) {
+        var obj = track && typeof track === "object" ? track : {};
+        var sid = obj.id || obj.mid || "";
+        var artists = obj.ar || obj.artists || obj.singer || obj.artist || [];
+        var names = artistText(artists);
+        return {
+          id: sid,
+          name: obj.name || obj.title || "",
+          ar: names ? names.split(" / ").map(function (name) { return { name: name }; }) : [],
+          al: { name: albumText(obj.al || obj.album), picUrl: obj.cover || obj.picUrl || (obj.al && obj.al.picUrl) || "" }
+        };
+      })
+    }});
   }
 
   if (kind === "pic") {
-    var cover = payload.cover || payload.pic || payload.picUrl || payload.albumPicUrl || payload.album.albumpic || "";
+    var album = payload && payload.album;
+    var cover = payload && (payload.cover || payload.pic || payload.picUrl || payload.albumPicUrl) || (album && (album.albumpic || album.picUrl)) || "";
     return JSON.stringify({ url: cover });
   }
 
-  // url / lyric: pass through resolved payload
   if (kind === "url") {
     if (typeof payload === "string") return JSON.stringify({ url: payload });
-    var u = payload.url || payload.playUrl || payload.play_url || payload.src || "";
-    var cover = payload.cover || payload.pic || "";
-    return JSON.stringify({ url: u, cover: cover, name: payload.name || "", artist: payload.singer || payload.artist || "" });
+    payload = payload || {};
+    return JSON.stringify({
+      url: payload.url || payload.playUrl || payload.play_url || payload.src || "",
+      cover: payload.cover || payload.pic || payload.picUrl || "",
+      name: payload.name || "",
+      artist: artistText(payload.singer || payload.artist || payload.artists),
+      lyric: payload.lrc || payload.lyric || ""
+    });
   }
 
   if (kind === "lyric") {
+    payload = payload || {};
     var lrc = payload.lrc || payload.lyric || payload.lrcLyric || payload.lrclist || payload.lrcList || "";
-    if (Array.isArray(lrc)) {
-      lrc = lrc.map(function (x) { return x.lyric || x.lrc || ""; }).join("\n");
-    }
-    if (lrc && typeof lrc === "object" && lrc.lyric) lrc = lrc.lyric;
-    return JSON.stringify({ lyric: lrc, translated: payload.trans || payload.tlyric || "" });
+    if (Array.isArray(lrc)) lrc = lrc.map(function (x) { return x && (x.lyric || x.lrc) || ""; }).join("\n");
+    if (lrc && typeof lrc === "object") lrc = lrc.lyric || lrc.lrc || "";
+    var translated = payload.trans || payload.tlyric || payload.translated || "";
+    if (translated && typeof translated === "object") translated = translated.lyric || "";
+    return JSON.stringify({ lyric: lrc, translated: translated });
   }
 
   return JSON.stringify(payload);
@@ -183,11 +218,14 @@ async function proxyApiRequest(url, request, waitUntil, env) {
   var built = buildChKSzUrl(url.searchParams, env);
   var czUrl = built.url;
   var cache = caches.default;
-  var ck = new URL(czUrl);
+  // Cache by the public proxy request, not only by the upstream URL. QQ/Kugou
+  // use one detail endpoint for URL, lyric and cover, but each proxy type has a
+  // different normalized response shape.
+  var ck = new URL(url.toString());
   ck.searchParams.delete("apikey");
   ck.searchParams.delete("s");
   ck.searchParams.delete("nocache");
-  var cacheKey = new Request(ck.toString(), request);
+  var cacheKey = new Request(ck.toString(), { method: "GET" });
   var bypass = url.searchParams.get("nocache") === "true";
 
   if (!bypass) {
@@ -215,8 +253,8 @@ async function proxyApiRequest(url, request, waitUntil, env) {
   }
 
   var raw = await upstream.text();
-  var kind = built.isSearch ? "search" : (built.pix ? "pic" : (url.searchParams.get("types") === "lyric" ? "lyric" : "url"));
-  var unwrapped = normalizeJson(raw, kind);
+  var kind = built.kind;
+  var unwrapped = normalizeJson(raw, kind, built.source);
   var status = upstream.status >= 200 && upstream.status < 500 ? upstream.status : 200;
   var outH = corsHeaders(new Headers({
     "Content-Type": "application/json; charset=utf-8",
@@ -375,7 +413,7 @@ export default {
     }
     if (pathname === "/proxy" || pathname.startsWith("/proxy")) {
       try {
-        return await proxyOnRequest({ request, waitUntil: ctx.waitUntil, env });
+        return await proxyOnRequest({ request, waitUntil: (promise) => ctx.waitUntil(promise), env });
       } catch (e) {
         const msg = "PROXY_ERR " + (e && e.stack ? e.stack : String(e));
         try { console.error(msg); } catch (_) {}
