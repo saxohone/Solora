@@ -833,15 +833,38 @@ const API = {
 
     search: async (keyword, source = "netease", count = 20, page = 1) => {
         const signature = API.generateSignature();
-        const url = `${API.baseUrl}?types=search&source=${source}&name=${encodeURIComponent(keyword)}&count=${count}&pages=${page}&s=${signature}`;
-
-        try {
+        const params = new URLSearchParams({
+            types: "search",
+            source,
+            name: keyword,
+            count: String(count),
+            pages: String(page),
+            s: signature,
+        });
+        const configuredBase = API.baseUrl;
+        const requestSearch = async (baseUrl) => {
+            const separator = baseUrl.includes("?") ? "&" : "?";
+            const url = `${baseUrl}${separator}${params.toString()}`;
             debugLog(`API请求: ${url}`);
             const data = await API.fetchJson(url);
-            debugLog(`API响应: ${JSON.stringify(data).substring(0, 200)}...`);
-
             if (!Array.isArray(data)) throw new Error("搜索结果格式错误");
+            return data;
+        };
 
+        try {
+            let data;
+            try {
+                data = await requestSearch(configuredBase);
+            } catch (primaryError) {
+                if (configuredBase === "/proxy") throw primaryError;
+                console.warn("自定义音乐 API 不可用，已自动回退到站点代理", primaryError);
+                const cfg = getApiConfig();
+                saveApiConfig({ ...cfg, baseUrl: "" });
+                data = await requestSearch("/proxy");
+                showNotification("自定义 API 不可用，已切换到站点默认接口");
+            }
+
+            debugLog(`API响应: ${JSON.stringify(data).substring(0, 200)}...`);
             return data.map(song => ({
                 id: song.id,
                 name: song.name,
@@ -851,7 +874,7 @@ const API = {
                 picUrl: song.picUrl,
                 url_id: song.url_id,
                 lyric_id: song.lyric_id,
-                source: song.source,
+                source: song.source || source,
             }));
         } catch (error) {
             debugLog(`API错误: ${error.message}`);
