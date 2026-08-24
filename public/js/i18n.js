@@ -8,6 +8,8 @@
         "标准音质": "Standard Quality",
         "高品音质": "High Quality",
         "无损音质": "Lossless",
+        "Hi-Res 音质": "Hi-Res",
+        "超清母带": "Master",
         "歌词将在此处同步显示": "Lyrics will be displayed here synchronously",
         "音乐服务由 ChKSz API 提供，仅供个人学习与交流，请支持正版音乐。": "Music services are provided by ChKSz API for personal study and communication only. Please support official releases.",
 

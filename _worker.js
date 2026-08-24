@@ -29,13 +29,45 @@ function handleOptions() {
 
 // Solara quality values -> provider-native quality values
 function mapBrToLevel(br) {
-  var m = { "128": "standard", "192": "exhigh", "320": "exhigh", "640": "lossless", "999": "lossless" };
-  return m[br] || "exhigh";
+  var m = {
+    "128": "standard",
+    "192": "exhigh",
+    "320": "exhigh",
+    "640": "lossless",
+    "999": "lossless",
+    "1999": "hires",
+    "9999": "jymaster",
+    "standard": "standard",
+    "exhigh": "exhigh",
+    "lossless": "lossless",
+    "hires": "hires",
+    "jyeffect": "jyeffect",
+    "sky": "sky",
+    "jymaster": "jymaster",
+    "master": "jymaster"
+  };
+  return m[String(br || "")] || "exhigh";
 }
 
 function mapProviderSize(br) {
-  var m = { "128": "128k", "192": "320k", "320": "320k", "640": "flac", "999": "flac" };
-  return m[br] || "flac";
+  var m = {
+    "128": "128k",
+    "192": "320k",
+    "320": "320k",
+    "640": "flac",
+    "999": "flac",
+    "1999": "hires",
+    "9999": "master",
+    "standard": "128k",
+    "exhigh": "320k",
+    "lossless": "flac",
+    "hires": "hires",
+    "jyeffect": "hires",
+    "sky": "hires",
+    "jymaster": "master",
+    "master": "master"
+  };
+  return m[String(br || "")] || "flac";
 }
 
 function normalizeProvider(source) {

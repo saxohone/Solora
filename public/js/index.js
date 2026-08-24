@@ -660,13 +660,26 @@ function normalizeSource(value) {
 
 const QUALITY_OPTIONS = [
     { value: "128", label: "标准音质", description: "128 kbps" },
-    { value: "192", label: "高品音质", description: "192 kbps" },
     { value: "320", label: "极高音质", description: "320 kbps" },
-    { value: "999", label: "无损音质", description: "FLAC" }
+    { value: "999", label: "无损音质", description: "FLAC" },
+    { value: "hires", label: "Hi-Res 音质", description: "Hi-Res" },
+    { value: "jymaster", label: "超清母带", description: "Master" }
 ];
 
+const QUALITY_ALIASES = {
+    "192": "320",
+    "640": "999",
+    "1999": "hires",
+    "9999": "jymaster",
+    "standard": "128",
+    "exhigh": "320",
+    "lossless": "999",
+    "master": "jymaster"
+};
+
 function normalizeQuality(value) {
-    const match = QUALITY_OPTIONS.find(option => option.value === value);
+    const mapped = QUALITY_ALIASES[value] || value;
+    const match = QUALITY_OPTIONS.find(option => option.value === mapped);
     return match ? match.value : "320";
 }
 
@@ -4470,12 +4483,9 @@ function showQualityMenu(event, index, type) {
     // 创建新的质量菜单
     const menu = document.createElement("div");
     menu.className = "dynamic-quality-menu";
-    menu.innerHTML = `
-        <div class="quality-option" onclick="downloadWithQuality(event, ${index}, '${type}', '128')">标准音质 (128k)</div>
-        <div class="quality-option" onclick="downloadWithQuality(event, ${index}, '${type}', '192')">高音质 (192k)</div>
-        <div class="quality-option" onclick="downloadWithQuality(event, ${index}, '${type}', '320')">超高音质 (320k)</div>
-        <div class="quality-option" onclick="downloadWithQuality(event, ${index}, '${type}', '999')">无损音质</div>
-    `;
+    menu.innerHTML = QUALITY_OPTIONS.map(option =>
+        `<div class="quality-option" onclick="downloadWithQuality(event, ${index}, '${type}', '${option.value}')">${option.label} (${option.description})</div>`
+    ).join("");
 
     // 设置菜单位置
     const button = event.target.closest("button");
@@ -6356,8 +6366,8 @@ async function downloadSong(song, quality = "320") {
 
             const link = document.createElement("a");
             link.href = downloadUrl;
-            const preferredExtension =
-                quality === "999" ? "flac" : quality === "740" ? "ape" : "mp3";
+            const losslessQualities = new Set(["999", "640", "hires", "jymaster", "1999", "9999"]);
+            const preferredExtension = losslessQualities.has(quality) ? "flac" : "mp3";
             const fileExtension = (() => {
                 try {
                     const url = new URL(audioData.url);
