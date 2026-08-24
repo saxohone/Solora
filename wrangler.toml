@@ -5,5 +5,5 @@ compatibility_date = "2026-08-22"
 assets = { directory = "public", binding = "ASSETS", not_found_handling = "404-page" }
 
 [vars]
-API_KEY = ""
-PASSWORD = ""
+API_KEY = "chksz_iuHlB0tLbMATBNZZLcgVNSSV6pXRlibtAY330DvMvRo"
+PASSWORD = "114514"

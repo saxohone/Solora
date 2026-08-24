@@ -43,7 +43,7 @@ function buildChKSzUrl(params, env) {
   var base = (env && env.API_BASE_URL && String(env.API_BASE_URL).trim())
     ? String(env.API_BASE_URL).trim().replace(/\/+$/, "")
     : "https://api.chksz.com";
-  var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : "";
+  var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (params.get("apikey") || "");
   var types = params.get("types") || "search";
   var source = params.get("source") || "netease";
   var u;
@@ -172,7 +172,7 @@ function normalizeJson(text, kind) {
 }
 
 async function proxyApiRequest(url, request, waitUntil, env) {
-  var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : "";
+  var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (url.searchParams.get("apikey") || "");
   if (!key) {
     return new Response(JSON.stringify({ error: "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key" }), {
       status: 401,
