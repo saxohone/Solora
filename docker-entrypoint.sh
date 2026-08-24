@@ -44,9 +44,9 @@ echo "  Language  : ${_LANG_VALUE:-ZH (default)}"
 echo "  ────────────────────────────────────────────────────"
 echo ""
 
-# ── 启动 wrangler pages dev 监听本地 8788 端口 ───────────────────────────────
+# ── 启动 wrangler pages dev 监听本地 8788 端口（静态目录 public） ───────────────────────────────
 echo "Starting wrangler pages dev in background on port 8788..."
-wrangler pages dev . \
+wrangler pages dev public \
   --ip 127.0.0.1 \
   --port 8788 \
   --d1 DB \

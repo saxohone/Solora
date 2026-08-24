@@ -11,3 +11,7 @@ docker-entrypoint.sh
 .gitignore
 README.md
 Preview.gif
+
+node_modules/
+package.json
+package-lock.json

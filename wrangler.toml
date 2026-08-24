@@ -2,7 +2,7 @@ name = "solora"
 main = "_worker.js"
 compatibility_date = "2026-08-22"
 
-assets = { directory = ".", binding = "ASSETS", not_found_handling = "404-page" }
+assets = { directory = "public", binding = "ASSETS", not_found_handling = "404-page" }
 
 [vars]
 API_KEY = ""
