@@ -769,8 +769,24 @@ const savedCurrentPlaylist = (() => {
 })();
 
 // API配置 - 修复API地址和请求方式
+
+// 用户自定义音乐 API 配置（localStorage）
+function getApiConfig() {
+    try {
+        const raw = localStorage.getItem("apiConfig");
+        if (raw) {
+            const c = JSON.parse(raw);
+            if (c && typeof c === "object") return c;
+        }
+    } catch (e) { /* ignore */ }
+    return {};
+}
+function saveApiConfig(cfg) {
+    try { localStorage.setItem("apiConfig", JSON.stringify(cfg || {})); } catch (e) { /* ignore */ }
+}
+
 const API = {
-    baseUrl: "/proxy",
+    get baseUrl() { const c = getApiConfig(); return (c.baseUrl && c.baseUrl.trim()) ? c.baseUrl.trim() : "/proxy"; },
 
     generateSignature: () => {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -778,6 +794,10 @@ const API = {
 
     fetchJson: async (url) => {
         try {
+            const apiCfg = getApiConfig();
+            if (apiCfg && apiCfg.apiKey && typeof url === "string" && url.indexOf("apikey=") < 0) {
+                url += (url.indexOf("?") >= 0 ? "&" : "?") + "apikey=" + encodeURIComponent(apiCfg.apiKey);
+            }
             const response = await fetch(url, {
                 headers: {
                     "Accept": "application/json",
@@ -6445,6 +6465,13 @@ function renderGenreList() {
 
 function openSettingsModal() {
     if (dom.settingsModal) {
+        const apiCfg = getApiConfig();
+        const apiBaseEl = document.getElementById("apiBaseUrlInput");
+        const apiKeyEl = document.getElementById("apiKeyInput");
+        const apiSourceEl = document.getElementById("apiSourceSelect");
+        if (apiBaseEl) apiBaseEl.value = apiCfg.baseUrl || "";
+        if (apiKeyEl) apiKeyEl.value = apiCfg.apiKey || "";
+        if (apiSourceEl) apiSourceEl.value = apiCfg.defaultSource || "netease";
         dom.settingsModal.classList.add("show");
         dom.settingsModal.setAttribute("aria-hidden", "false");
     }
@@ -6478,6 +6505,16 @@ async function saveSettings() {
             radarSettings: JSON.stringify(state.radarSettings)
         });
     }
+
+    // 保存自定义音乐 API 配置
+    const apiBaseEl = document.getElementById("apiBaseUrlInput");
+    const apiKeyEl = document.getElementById("apiKeyInput");
+    const apiSourceEl = document.getElementById("apiSourceSelect");
+    saveApiConfig({
+        baseUrl: (apiBaseEl && apiBaseEl.value.trim()) || "",
+        apiKey: (apiKeyEl && apiKeyEl.value.trim()) || "",
+        defaultSource: (apiSourceEl && apiSourceEl.value) || "netease"
+    });
 
     showNotification("设置已保存", "success");
     closeSettingsModal();

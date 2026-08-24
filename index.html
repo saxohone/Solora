@@ -16,6 +16,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/enhance.css">
     <script src="js/i18n.js"></script>
     <script>
         (function () {
@@ -524,6 +525,26 @@
                 </div>
             </section>
         </div>
+            <section class="settings-section api-config-section">
+                <h3>音乐 API</h3>
+                <p class="settings-hint">自定义音乐接口地址与密钥（留空使用默认 /proxy 服务端配置）</p>
+                <div class="api-config-row">
+                    <label for="apiBaseUrlInput">API 地址</label>
+                    <input type="text" id="apiBaseUrlInput" class="api-config-input" placeholder="/proxy 或 https://api.example.com/api.php" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="api-config-row">
+                    <label for="apiKeyInput">API Key（可选）</label>
+                    <input type="password" id="apiKeyInput" class="api-config-input" placeholder="留空则使用服务端默认" autocomplete="off">
+                </div>
+                <div class="api-config-row">
+                    <label for="apiSourceSelect">默认音源</label>
+                    <select id="apiSourceSelect" class="api-config-input">
+                        <option value="netease">网易云</option>
+                        <option value="qq">QQ音乐</option>
+                        <option value="kugou">酷狗</option>
+                    </select>
+                </div>
+            </section>
         <div class="modal-footer">
             <button id="saveSettingsBtn" class="save-settings-btn">保存设置</button>
         </div>

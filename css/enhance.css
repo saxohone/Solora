@@ -1,0 +1,152 @@
+/* ============================================================
+   Solara UI Enhance — 渐变 · 毛玻璃 · 卡片动效 · 设置面板
+   追加层：不影响原 style.css / mobile.css / desktop.css
+   ============================================================ */
+:root {
+  --sol-primary: #6c5ce7;
+  --sol-primary-2: #8e5ce7;
+  --sol-accent: #00cec9;
+  --sol-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --sol-grad-soft: linear-gradient(135deg, rgba(102,126,234,.35), rgba(118,75,162,.35));
+  --sol-glass: rgba(255, 255, 255, 0.07);
+  --sol-glass-strong: rgba(20, 24, 45, 0.78);
+  --sol-border: rgba(255, 255, 255, 0.13);
+  --sol-radius: 16px;
+  --sol-shadow: 0 10px 40px rgba(0, 0, 0, 0.38);
+  --sol-transition: all .25s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ---- 全局渐变背景 ---- */
+html, body {
+  background: linear-gradient(160deg, #0f1224 0%, #1b1f3a 55%, #271d3a 100%) !important;
+  background-attachment: fixed !important;
+}
+
+/* ---- 按钮统一动效 ---- */
+button {
+  transition: var(--sol-transition);
+}
+button:not(:disabled):active {
+  transform: scale(.94);
+}
+
+/* ---- 卡片 / 面板毛玻璃 ---- */
+.card, .panel, .modal-content, .mobile-panel,
+.playlist, .settings-content, .player-panel, .source-menu,
+.import-dropdown-menu, .player-quality-menu {
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--sol-border);
+  box-shadow: var(--sol-shadow);
+}
+
+/* ---- 设置弹窗 ---- */
+.settings-content {
+  border-radius: var(--sol-radius) !important;
+  background: var(--sol-glass-strong) !important;
+}
+.modal-header h2 {
+  background: var(--sol-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font-weight: 700;
+}
+
+/* ---- 音乐 API 设置区 ---- */
+.api-config-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--sol-border);
+}
+.api-config-section h3 {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.api-config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+.api-config-row label {
+  font-size: 12px;
+  opacity: .75;
+  letter-spacing: .3px;
+}
+.api-config-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sol-border);
+  background: var(--sol-glass);
+  color: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: var(--sol-transition);
+}
+.api-config-input:focus {
+  border-color: var(--sol-accent);
+  box-shadow: 0 0 0 3px rgba(0, 206, 201, .18);
+  background: rgba(255,255,255,.1);
+}
+.api-config-input::placeholder {
+  color: rgba(255,255,255,.35);
+}
+
+/* ---- 主题按钮 / 齿轮 ---- */
+.theme-toggle-button:hover {
+  transform: rotate(40deg) scale(1.08);
+  color: var(--sol-accent);
+}
+
+/* ---- 滚动条 ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--sol-grad-soft);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sol-grad);
+}
+
+/* ---- 封面/卡片 hover 微动效（谨慎，仅桌面）---- */
+@media (hover: hover) and (pointer: fine) {
+  .playlist-item, .song-item, .online-item {
+    transition: var(--sol-transition);
+  }
+  .playlist-item:hover, .song-item:hover, .online-item:hover {
+    transform: translateY(-2px);
+    background: var(--sol-glass) !important;
+  }
+}
+
+/* ---- 加载骨架屏（搜索/列表加载时给容器一个呼吸感） ---- */
+.skeleton-aware:empty {
+  min-height: 60px;
+  background: linear-gradient(90deg, var(--sol-glass) 25%, rgba(255,255,255,.12) 50%, var(--sol-glass) 75%);
+  background-size: 200% 100%;
+  animation: sol-shimmer 1.4s infinite;
+  border-radius: var(--sol-radius);
+}
+@keyframes sol-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---- 淡入 ---- */
+@keyframes sol-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.modal-content.show, .modal-overlay.show .modal-content {
+  animation: sol-fade-in .28s ease-out;
+}
