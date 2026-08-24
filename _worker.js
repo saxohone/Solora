@@ -374,7 +374,13 @@ export default {
       return handleOptions();
     }
     if (pathname === "/proxy" || pathname.startsWith("/proxy")) {
-      return proxyOnRequest({ request, waitUntil: ctx.waitUntil, env });
+      try {
+        return await proxyOnRequest({ request, waitUntil: ctx.waitUntil, env });
+      } catch (e) {
+        const msg = "PROXY_ERR " + (e && e.stack ? e.stack : String(e));
+        try { console.error(msg); } catch (_) {}
+        return new Response(msg, { status: 500, headers: { "Content-Type": "text/plain", "Access-Control-Allow-Origin": "*" } });
+      }
     }
     if (pathname === "/api/login" && request.method === "POST") {
       return loginOnRequestPost({ request, env });
