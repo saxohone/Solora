@@ -174,7 +174,8 @@ function normalizeJson(text, kind, source) {
 
   var payload = parsed;
   if (typeof parsed.code === "number" && parsed.code !== 200 && parsed.code !== 0) {
-    return JSON.stringify({ error: parsed.msg || ("ChKSz error " + parsed.code), code: parsed.code });
+    var errMsg = parsed.msg || parsed.error || parsed.message || ("API error " + parsed.code);
+    return JSON.stringify({ error: errMsg, code: parsed.code });
   }
   if (parsed.data !== undefined) payload = parsed.data;
   else if (Array.isArray(parsed.list)) payload = parsed.list;
@@ -354,7 +355,9 @@ function buildGdStudioUrl(params) {
 // Try GDStudio API. Returns { normalized } on success, null on failure.
 async function tryGdStudio(params, request) {
   if (!gdstudioCanHandle(params)) return null;
-  try {
+
+  // Inner helper does one fetch attempt; returns { normalized } or null.
+  async function attempt() {
     var built = buildGdStudioUrl(params);
     var response = await fetch(built.url, { headers: {
       "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
@@ -366,9 +369,43 @@ async function tryGdStudio(params, request) {
     var normalized = normalizeJson(raw, built.kind, built.source);
     var parsed;
     try { parsed = JSON.parse(normalized); } catch (_) { return null; }
-    if (parsed && parsed.error) return null;
-    if (parsed && typeof parsed.code === "number" && parsed.code !== 200 && parsed.code !== 0) return null;
+    // Treat an error payload (e.g. dead netease outer/url -> {error:"...404"}) or a
+    // missing url as a bad result for url/lyric/pic types.
+    if (parsed && typeof parsed === "object") {
+      if (parsed.error) {
+        // Quota / rate-limit codes: no point retrying or falling back to a keyed
+        // API; surface the GDStudio message directly so the user sees why.
+        if (parsed.code === 402 || parsed.code === 403 || parsed.code === 429) {
+          return { __bad: false, __quota: parsed.error };
+        }
+        return { __bad: true };
+      }
+      if (typeof parsed.code === "number" && parsed.code !== 200 && parsed.code !== 0) {
+        if (parsed.code === 402 || parsed.code === 403 || parsed.code === 429) {
+          return { __bad: false, __quota: parsed.error || ("HTTP " + parsed.code + " 请求受限") };
+        }
+        return { __bad: true };
+      }
+      if (built.kind === "url" && (parsed.url === undefined || parsed.url === "" )) return { __bad: true };
+      if (built.kind === "pic" && (parsed.url === undefined || parsed.url === "" )) return { __bad: true };
+      if (built.kind === "lyric" && parsed.lyric === undefined && parsed.translated === undefined) return { __bad: true };
+    }
     return { normalized: normalized, kind: built.kind, source: built.source };
+  }
+
+  try {
+    // First attempt.
+    var first = await attempt();
+    if (!first) return null;
+    if (first.__quota) return first;      // quota: surface immediately, no retry
+    if (!first.__bad) return first;       // healthy result
+    // Second attempt: GDStudio issues fresh, timestamped playback URLs, so a retry
+    // frequently yields a working address rather than falling back to ChKSz.
+    try { await new Promise(function (res) { setTimeout(res, 250); }); } catch (_) {}
+    var second = await attempt();
+    if (!second) return null;
+    if (second.__quota) return second;
+    return second.__bad ? null : second;
   } catch (e) {
     try { console.warn("GDStudio request failed, falling back to ChKSz:", e && e.message || e); } catch (_) {}
     return null;
@@ -401,7 +438,14 @@ async function proxyApiRequest(url, request, waitUntil, env) {
 
   // --- Try GDStudio API first (free, no key needed) for netease/kuwo ---
   var gdResult = await tryGdStudio(url.searchParams, request);
-  if (gdResult) {
+  var gdQuotaMsg = (gdResult && gdResult.__quota) ? gdResult.__quota : "";
+  if (gdQuotaMsg) {
+    // GDStudio free quota exhausted / rate-limited (402/403/429). Do NOT surface
+    // immediately: record the message and still try the keyed ChKSz fallback so
+    // playback can continue. Only surface the quota message if the fallback fails.
+    try { console.warn("GDStudio quota hit, attempting ChKSz fallback:", gdQuotaMsg); } catch (_) {}
+  }
+  if (gdResult && !gdQuotaMsg) {
     var gdNormalized = gdResult.normalized;
     if (imageMode) {
       var gdImg;
@@ -428,15 +472,22 @@ async function proxyApiRequest(url, request, waitUntil, env) {
       "X-Cache-Status": "MISS",
       "X-Backend": "gdstudio"
     }));
-    if (!bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(gdNormalized, { headers: { "Content-Type": "application/json" } })));
+    // Never cache a failed/dead URL response (e.g. netease outer/url 404) so the
+    // error does not get served repeatedly for 300s. Only cache healthy JSON.
+    var gdCacheable = true;
+    try {
+      var gdProbe = JSON.parse(gdNormalized);
+      if (gdProbe && typeof gdProbe === "object" && (gdProbe.error || (gdProbe.url !== undefined && !gdProbe.url))) gdCacheable = false;
+    } catch (_) {}
+    if (gdCacheable && !bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(gdNormalized, { headers: { "Content-Type": "application/json" } })));
     return new Response(gdNormalized, { status: 200, headers: gdOutH });
   }
 
   // --- Fall back to ChKSz API ---
   var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (url.searchParams.get("apikey") || "");
   if (!key) {
-    return new Response(JSON.stringify({ error: "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key" }), {
-      status: 401,
+    return new Response(JSON.stringify({ error: gdQuotaMsg || "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key", code: gdQuotaMsg ? 402 : 401, gd_quota: !!gdQuotaMsg }), {
+      status: gdQuotaMsg ? 402 : 401,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   }
@@ -487,7 +538,14 @@ async function proxyApiRequest(url, request, waitUntil, env) {
     "X-Backend": "chksz"
   }));
 
-  if (upstream.status === 200 && !bypass && waitUntil) {
+  // Never cache failed/dead responses so an error (e.g. netease outer/url 404)
+  // is not served repeatedly for 300s.
+  var czCacheable = true;
+  try {
+    var czProbe = JSON.parse(unwrapped);
+    if (czProbe && typeof czProbe === "object" && (czProbe.error || (czProbe.url !== undefined && !czProbe.url))) czCacheable = false;
+  } catch (_) {}
+  if (czCacheable && upstream.status === 200 && !bypass && waitUntil) {
     waitUntil(cache.put(cacheKey, new Response(unwrapped, { headers: { "Content-Type": "application/json" } })));
   }
   return new Response(unwrapped, { status: status, headers: outH });
