@@ -50,6 +50,10 @@
             redesignLinkMobile.href = "css/redesign.css?v=20260826-5";
             redesignLinkMobile.id = "redesignStylesheet";
             document.head.appendChild(redesignLinkMobile);
+            const mobileFixesLink = document.createElement("link");
+            mobileFixesLink.rel = "stylesheet";
+            mobileFixesLink.href = "css/mobile-fixes.css?v=20260826-1";
+            document.head.appendChild(mobileFixesLink);
             const setViewportUnit = () => {
                 const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
                 document.documentElement.style.setProperty("--mobile-vh", `${viewportHeight}px`);
@@ -102,13 +106,6 @@
             }
         }
     </style>
-    <script>
-        (function fixMobileVH(){
-            document.documentElement.style.setProperty("--mobile-vh", window.innerHeight + "px");
-            window.addEventListener("resize", fixMobileVH);
-            window.addEventListener("orientationchange", fixMobileVH);
-        })();
-    </script>
 
 </head>
 <body>
