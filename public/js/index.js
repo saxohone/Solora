@@ -961,7 +961,17 @@ const API = {
     getPicUrl: (song) => {
         const signature = API.generateSignature();
         const picId = song.pic_id || song.id;
-        return `${API.baseUrl}?types=pic&id=${picId}&source=${song.source || "netease"}&size=300&s=${signature}`;
+        const params = new URLSearchParams({
+            types: "pic",
+            id: String(picId || ""),
+            source: song.source || "netease",
+            size: "300",
+            name: song.name || "",
+            artist: Array.isArray(song.artist) ? song.artist.join(" ") : (song.artist || ""),
+            album: typeof song.album === "string" ? song.album : (song.album?.name || ""),
+            s: signature,
+        });
+        return `${API.baseUrl}?${params.toString()}`;
     }
 };
 
@@ -3915,21 +3925,19 @@ function updateCurrentSongInfo(song, options = {}) {
             ? preferHttpsUrl(song.picUrl)
             : null;
         const loadImage = resolvedUrl => new Promise((resolve, reject) => {
-            if (!resolvedUrl || !resolvedUrl.startsWith("http")) {
+            if (!resolvedUrl || typeof resolvedUrl !== "string") {
                 reject(new Error("封面地址缺失"));
                 return;
             }
 
-            const imageUrl = preferHttpsUrl(resolvedUrl);
+            const imageUrl = preferHttpsUrl(toAbsoluteUrl(resolvedUrl));
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = () => resolve(imageUrl);
             img.onerror = () => reject(new Error("封面图片加载失败: " + imageUrl));
             img.src = imageUrl;
         });
-        const loadProxyArtwork = () => API.fetchJson(API.getPicUrl(song)).then(data =>
-            loadImage(data && typeof data === "object" ? data.url : data)
-        );
+        const loadProxyArtwork = () => loadImage(API.getPicUrl(song) + "&format=image");
         const artworkRequest = directPicUrl
             ? loadImage(directPicUrl).catch(error => {
                 console.warn("封面直链加载失败，尝试站点代理", error);
@@ -4118,7 +4126,23 @@ function createSearchResultItem(song, index) {
     item.className = "search-result-item";
     item.dataset.index = String(index);
 
-    // 选择圆圈 (替代封面位置)
+    const artwork = document.createElement("div");
+    artwork.className = "search-result-artwork";
+    artwork.setAttribute("aria-hidden", "true");
+    const artworkPlaceholder = document.createElement("span");
+    artworkPlaceholder.className = "search-result-artwork-placeholder";
+    artworkPlaceholder.innerHTML = '<i class="fas fa-music"></i>';
+    artwork.appendChild(artworkPlaceholder);
+    const artworkImage = document.createElement("img");
+    artworkImage.className = "search-result-artwork-image";
+    artworkImage.alt = "";
+    artworkImage.loading = "lazy";
+    artworkImage.decoding = "async";
+    artworkImage.addEventListener("load", () => artwork.classList.add("has-image"));
+    artworkImage.addEventListener("error", () => artwork.classList.remove("has-image"), { once: true });
+    artworkImage.src = API.getPicUrl(song) + "&format=image";
+    artwork.appendChild(artworkImage);
+
     const selectionToggle = document.createElement("button");
     selectionToggle.className = "search-result-select";
     selectionToggle.type = "button";
@@ -4186,6 +4210,7 @@ function createSearchResultItem(song, index) {
     actions.appendChild(downloadButton);
 
     item.appendChild(selectionToggle);
+    item.appendChild(artwork);
     item.appendChild(info);
     item.appendChild(actions);
 

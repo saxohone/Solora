@@ -176,7 +176,7 @@ function normalizeJson(text, kind, source) {
         artist: artist,
         album: albumText(obj.album || obj.albumname || obj.albumName),
         pic_id: String(songId),
-        picUrl: obj.cover || obj.pic || obj.picUrl || obj.albm || "",
+        picUrl: obj.cover || obj.pic || obj.picUrl || obj.album_img || obj.albumImg || obj.albm || "",
         url_id: String(songId),
         lyric_id: String(songId),
         source: source
@@ -209,7 +209,7 @@ function normalizeJson(text, kind, source) {
 
   if (kind === "pic") {
     var album = payload && payload.album;
-    var cover = payload && (payload.cover || payload.pic || payload.picUrl || payload.albumPicUrl) || (album && (album.albumpic || album.picUrl)) || "";
+    var cover = payload && (payload.cover || payload.pic || payload.picUrl || payload.album_img || payload.albumImg || payload.albumPicUrl) || (album && (album.albumpic || album.album_img || album.albumImg || album.picUrl)) || "";
     return JSON.stringify({ url: cover });
   }
 
@@ -238,8 +238,61 @@ function normalizeJson(text, kind, source) {
   return JSON.stringify(payload);
 }
 
+function comparableText(value) {
+  return String(value || "").toLowerCase().replace(/[\s\-_/,.()\[\]]/g, "");
+}
+
+function pickArtworkMatch(songs, name, artist, album) {
+  var targetName = comparableText(name);
+  var targetArtist = comparableText(artist);
+  var targetAlbum = comparableText(album);
+  var candidates = (Array.isArray(songs) ? songs : []).filter(function (song) {
+    return song && typeof song.picUrl === "string" && /^https?:\/\//i.test(song.picUrl);
+  });
+  candidates.sort(function (a, b) {
+    function score(song) {
+      var songName = comparableText(song.name);
+      var songArtist = comparableText(song.artist);
+      var songAlbum = comparableText(song.album);
+      var value = 0;
+      if (targetName && songName === targetName) value += 100;
+      else if (targetName && (songName.includes(targetName) || targetName.includes(songName))) value += 45;
+      if (targetArtist && (songArtist.includes(targetArtist) || targetArtist.includes(songArtist))) value += 35;
+      if (targetAlbum && songAlbum === targetAlbum) value += 20;
+      return value;
+    }
+    return score(b) - score(a);
+  });
+  return candidates[0] || null;
+}
+
+async function findNeteaseArtwork(params, env, request) {
+  var name = params.get("name") || "";
+  var artist = params.get("artist") || "";
+  var album = params.get("album") || "";
+  if (!name) return "";
+  var searchParams = new URLSearchParams();
+  searchParams.set("types", "search");
+  searchParams.set("source", "netease");
+  searchParams.set("name", [name, artist].filter(Boolean).join(" "));
+  searchParams.set("count", "8");
+  searchParams.set("pages", "1");
+  var built = buildChKSzUrl(searchParams, env);
+  var response = await fetch(built.url, { headers: {
+    "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+    "Accept": "application/json"
+  }});
+  if (!response.ok) return "";
+  var normalized = normalizeJson(await response.text(), "search", "netease");
+  var songs;
+  try { songs = JSON.parse(normalized); } catch (_) { songs = []; }
+  var match = pickArtworkMatch(songs, name, artist, album);
+  return match ? match.picUrl : "";
+}
+
 async function proxyApiRequest(url, request, waitUntil, env) {
   var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (url.searchParams.get("apikey") || "");
+  var imageMode = url.searchParams.get("format") === "image" && url.searchParams.get("types") === "pic";
   if (!key) {
     return new Response(JSON.stringify({ error: "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key" }), {
       status: 401,
@@ -264,7 +317,7 @@ async function proxyApiRequest(url, request, waitUntil, env) {
     var cached = await cache.match(cacheKey);
     if (cached) {
       return new Response(cached.body, { status: 200, headers: corsHeaders(new Headers({
-        "Content-Type": "application/json",
+        "Content-Type": imageMode ? (cached.headers.get("Content-Type") || "image/jpeg") : "application/json",
         "Cache-Control": "public, max-age=300",
         "X-Cache-Status": "HIT"
       })) });
@@ -287,6 +340,25 @@ async function proxyApiRequest(url, request, waitUntil, env) {
   var raw = await upstream.text();
   var kind = built.kind;
   var unwrapped = normalizeJson(raw, kind, built.source);
+  if (imageMode) {
+    var imageData;
+    try { imageData = JSON.parse(unwrapped); } catch (_) { imageData = {}; }
+    var imageUrl = imageData && typeof imageData.url === "string" ? imageData.url : "";
+    if (!/^https?:\/\//i.test(imageUrl)) {
+      try { imageUrl = await findNeteaseArtwork(url.searchParams, env, request); }
+      catch (error) { try { console.warn("Netease artwork fallback failed", error); } catch (_) {} }
+    }
+    if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
+      return new Response(JSON.stringify({ error: "封面地址为空", code: 404 }), { status: 404, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) });
+    }
+    var imageResponse;
+    try { imageResponse = await fetch(imageUrl, { headers: { "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0", "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" } }); }
+    catch (error) { return new Response(JSON.stringify({ error: "封面上游请求失败", detail: String(error && error.message || error) }), { status: 502, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) }); }
+    if (!imageResponse.ok) return new Response(JSON.stringify({ error: "封面上游返回错误", code: imageResponse.status }), { status: imageResponse.status, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) });
+    var imageHeaders = corsHeaders(new Headers({ "Content-Type": imageResponse.headers.get("Content-Type") || "image/jpeg", "Cache-Control": "public, max-age=86400", "X-Cache-Status": "MISS" }));
+    if (!bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(imageResponse.clone().body, { headers: imageHeaders })));
+    return new Response(imageResponse.body, { status: 200, headers: imageHeaders });
+  }
   var status = upstream.status >= 200 && upstream.status < 500 ? upstream.status : 200;
   var outH = corsHeaders(new Headers({
     "Content-Type": "application/json; charset=utf-8",
