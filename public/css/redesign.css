@@ -831,3 +831,26 @@ input[type="range"]::-moz-range-thumb { width: 11px !important; height: 11px !im
   body.mobile-view .search-result-item { grid-template-columns: 28px 52px minmax(0, 1fr) auto !important; min-height: 74px !important; gap: 8px !important; padding: 8px !important; }
   body.mobile-view .search-result-artwork { width: 52px !important; height: 52px !important; flex-basis: 52px !important; }
 }
+
+/* Full-viewport application shell: music content should use the available screen. */
+body { padding: 0 !important; }
+.container {
+  width: 100vw !important;
+  max-width: none !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+@media (max-width: 820px) {
+  body.mobile-view {
+    padding: 0 !important;
+  }
+  body.mobile-view .container {
+    width: 100vw !important;
+    max-width: none !important;
+    min-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+}
