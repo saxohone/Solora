@@ -649,6 +649,7 @@ function buildAudioProxyUrl(url) {
 
 const SOURCE_OPTIONS = [
     { value: "netease", label: "网易云音乐" },
+    { value: "bugpk", label: "网易云增强" },
     { value: "qq", label: "QQ音乐" },
     { value: "kugou", label: "酷狗音乐" }
 ];
@@ -878,7 +879,7 @@ const API = {
             }
 
             debugLog(`API响应: ${JSON.stringify(data).substring(0, 200)}...`);
-            return data.map(song => ({
+            return data.map(song => sanitizeImportedSong({
                 id: song.id,
                 name: song.name,
                 artist: song.artist || song.artists || "未知艺术家",
@@ -888,7 +889,7 @@ const API = {
                 url_id: song.url_id,
                 lyric_id: song.lyric_id,
                 source: song.source || source,
-            }));
+            })).filter(Boolean);
         } catch (error) {
             debugLog(`API错误: ${error.message}`);
             throw error;
@@ -941,7 +942,7 @@ const API = {
                 source: "netease",
                 lyric_id: track.id,
                 pic_id: track.al?.pic_str || track.al?.pic || track.al?.picUrl || "",
-            }));
+            })).filter(Boolean);
         } catch (error) {
             console.error("API request failed:", error);
             throw error;
@@ -3902,12 +3903,12 @@ function setupInteractions() {
 function updateCurrentSongInfo(song, options = {}) {
     const { loadArtwork = true } = options;
     state.currentSong = song;
-    dom.currentSongTitle.textContent = song.name;
+    dom.currentSongTitle.textContent = songDisplayName(state.currentSong);
     updateMobileToolbarTitle();
     updateFavoriteIcons();
 
     // 修复艺人名称显示问题 - 使用正确的字段名
-    const artistText = Array.isArray(song.artist) ? song.artist.join(', ') : (song.artist || '未知艺术家');
+    const artistText = songDisplayArtist(state.currentSong);
     dom.currentSongArtist.textContent = artistText;
 
     cancelDeferredPaletteUpdate();
@@ -4160,13 +4161,11 @@ function createSearchResultItem(song, index) {
 
     const title = document.createElement("div");
     title.className = "search-result-title";
-    title.textContent = song.name || "未知歌曲";
+    title.textContent = songDisplayName(song);
 
     const artist = document.createElement("div");
     artist.className = "search-result-artist";
-    const artistName = Array.isArray(song.artist)
-        ? song.artist.join(', ')
-        : (song.artist || "未知艺术家");
+    const artistName = songDisplayArtist(song);
     const albumText = song.album ? ` - ${song.album}` : "";
     artist.textContent = `${artistName}${albumText}`;
 
@@ -4657,6 +4656,11 @@ function resolveSongId(song) {
     return null;
 }
 
+function cleanMusicText(v){if(typeof v !== "string") return "";let t=v.trim();let old="";while(t!==old){old=t;t=t.replace(/\([^()]*\)|\[[^\[\]]*\]/g,"")}return t.replace(/[\[\]()]/g,"").replace(/^[ _\-|]+|[ _\-|]+$/g,"").replace(/  +/g," ").trim()}
+function songDisplayName(s){return cleanMusicText(s&&s.name)||"未命名歌曲"}
+function songDisplayArtist(s){let v=s&&(s.artist||s.artists||s.singers||s.singer);let a=Array.isArray(v)?v:[v];return a.map(x=>typeof x==="string"?cleanMusicText(x):(x&&x.name?cleanMusicText(x.name):"")).filter(Boolean).join(", ")||"未知艺术家"}
+function songDisplayLine(s){return songDisplayName(s)+" - "+songDisplayArtist(s)}
+
 function normalizeArtistValue(value) {
     if (Array.isArray(value)) {
         const names = value.map((item) => {
@@ -4728,7 +4732,7 @@ function sanitizeImportedSong(rawSong) {
     if (!rawSong || typeof rawSong !== "object") {
         return null;
     }
-    const name = typeof rawSong.name === "string" ? rawSong.name.trim() : "";
+    const name = typeof rawSong.name === "string" ? cleanMusicText(rawSong.name) : "";
     if (!name) {
         return null;
     }
@@ -4941,9 +4945,7 @@ function renderPlaylist() {
 
     dom.playlist.classList.remove("empty");
     const playlistHtml = state.playlistSongs.map((song, index) => {
-        const artistValue = Array.isArray(song.artist)
-            ? song.artist.join(", ")
-            : (song.artist || "未知艺术家");
+        const artistValue = songDisplayArtist(song);
         const songKey = getSongKey(song) || `playlist-${index}`;
         return `
         <div class="playlist-item" data-index="${index}" role="button" tabindex="0" aria-label="播放 ${song.name}" data-favorite-key="${songKey}">
@@ -5203,9 +5205,7 @@ function renderFavorites() {
 
     dom.favorites.classList.remove("empty");
     const favoritesHtml = favorites.map((song, index) => {
-        const artistValue = Array.isArray(song.artist)
-            ? song.artist.join(", ")
-            : (song.artist || "未知艺术家");
+        const artistValue = songDisplayArtist(song);
         const isCurrent = state.currentList === "favorite" && index === state.currentFavoriteIndex;
         const songKey = getSongKey(song) || `favorite-${index}`;
         return `
@@ -6246,7 +6246,7 @@ function parseLyrics(lyricText) {
             const seconds = parseInt(match[2]);
             const milliseconds = parseInt(match[3].padEnd(3, '0'));
             const time = minutes * 60 + seconds + milliseconds / 1000;
-            const text = match[4].trim();
+            const text = cleanMusicText(match[4]);
 
             if (text) {
                 lyrics.push({ time, text });

@@ -71,7 +71,7 @@ function mapProviderSize(br) {
 }
 
 function normalizeProvider(source) {
-  return source === "qq" || source === "kugou" ? source : "netease";
+  return source === "qq" || source === "kugou" || source === "bugpk" ? source : "netease";
 }
 
 // Build a ChKSz request from Solara's legacy /proxy parameters.
@@ -91,7 +91,12 @@ function buildChKSzUrl(params, env) {
     var count = Math.max(1, Math.min(50, parseInt(params.get("count") || "20", 10) || 20));
     var page = Math.max(1, parseInt(params.get("pages") || "1", 10) || 1);
     var offset = (page - 1) * count;
-    if (source === "qq") {
+    if (source === "bugpk") {
+      u = new URL((env && env.BUGPK_BASE_URL ? String(env.BUGPK_BASE_URL).replace(/\/+$/, "") : "https://api.bugpk.com") + "/api/163_music");
+      u.searchParams.set("type", "search");
+      u.searchParams.set("s", kw);
+      u.searchParams.set("limit", String(count));
+    } else if (source === "qq") {
       u = new URL(base + "/api/qq_music");
       u.searchParams.set("msg", kw);
       u.searchParams.set("num", String(count));
@@ -110,6 +115,12 @@ function buildChKSzUrl(params, env) {
     u = new URL(base + "/api/163_playlist");
     u.searchParams.set("id", id);
   } else if (types === "url" || types === "lyric" || types === "pic") {
+    if (source === "bugpk") {
+      u = new URL((env && env.BUGPK_BASE_URL ? String(env.BUGPK_BASE_URL).replace(/\/+$/, "") : "https://api.bugpk.com") + "/api/163_music");
+      u.searchParams.set("id", id);
+      u.searchParams.set("type", types === "lyric" ? "lyric" : (types === "pic" ? "song" : "url"));
+      if (types === "url") u.searchParams.set("level", mapBrToLevel(br));
+    } else
     if (source === "qq") {
       u = new URL(base + "/api/qq_music");
       u.searchParams.set("mid", id);
@@ -168,7 +179,7 @@ function normalizeJson(text, kind, source) {
       : [];
     return JSON.stringify(arr.map(function (it) {
       var obj = (it && typeof it === "object") ? it : {};
-      var songId = obj.id || obj.mid || obj.songmid || "";
+      var songId = obj.id || obj.mid || obj.songmid || obj.songId || "";
       var artist = artistText(obj.singer || obj.artist || obj.artists || obj.author) || "未知艺术家";
       return {
         id: String(songId),
@@ -176,7 +187,7 @@ function normalizeJson(text, kind, source) {
         artist: artist,
         album: albumText(obj.album || obj.albumname || obj.albumName),
         pic_id: String(songId),
-        picUrl: obj.cover || obj.pic || obj.picUrl || obj.album_img || obj.albumImg || obj.albm || "",
+        picUrl: obj.cover || obj.pic || obj.picUrl || obj.picimg || obj.album_img || obj.albumImg || obj.albm || "",
         url_id: String(songId),
         lyric_id: String(songId),
         source: source
@@ -209,15 +220,16 @@ function normalizeJson(text, kind, source) {
 
   if (kind === "pic") {
     var album = payload && payload.album;
-    var cover = payload && (payload.cover || payload.pic || payload.picUrl || payload.album_img || payload.albumImg || payload.albumPicUrl) || (album && (album.albumpic || album.album_img || album.albumImg || album.picUrl)) || "";
+    var cover = payload && (payload.cover || payload.pic || payload.picUrl || payload.picimg || payload.album_img || payload.albumImg || payload.albumPicUrl) || (album && (album.albumpic || album.album_img || album.albumImg || album.picUrl)) || "";
     return JSON.stringify({ url: cover });
   }
 
   if (kind === "url") {
+    if (Array.isArray(payload)) payload = payload[0] || {};
     if (typeof payload === "string") return JSON.stringify({ url: payload });
     payload = payload || {};
     return JSON.stringify({
-      url: payload.url || payload.playUrl || payload.play_url || payload.src || "",
+      url: payload.url || payload.playUrl || payload.play_url || payload.src || payload.url320 || payload.url128 || "",
       cover: payload.cover || payload.pic || payload.picUrl || "",
       name: payload.name || "",
       artist: artistText(payload.singer || payload.artist || payload.artists),
@@ -227,7 +239,7 @@ function normalizeJson(text, kind, source) {
 
   if (kind === "lyric") {
     payload = payload || {};
-    var lrc = payload.lrc || payload.lyric || payload.lrcLyric || payload.lrclist || payload.lrcList || "";
+    var lrc = payload.lrc || payload.lyric || payload.lrcLyric || payload.lrclist || payload.lrcList || (typeof payload === "string" ? payload : "") || "";
     if (Array.isArray(lrc)) lrc = lrc.map(function (x) { return x && (x.lyric || x.lrc) || ""; }).join("\n");
     if (lrc && typeof lrc === "object") lrc = lrc.lyric || lrc.lrc || "";
     var translated = payload.trans || payload.tlyric || payload.translated || "";
