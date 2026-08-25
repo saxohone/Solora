@@ -193,10 +193,10 @@ function normalizeJson(text, kind, source) {
         name: obj.name || obj.title || obj.songname || obj.songName || "",
         artist: artist,
         album: albumText(obj.album || obj.albumname || obj.albumName),
-        pic_id: String(songId),
+        pic_id: String(obj.pic_id || songId),
         picUrl: obj.cover || obj.pic || obj.picUrl || obj.picimg || obj.album_img || obj.albumImg || obj.albm || "",
-        url_id: String(songId),
-        lyric_id: String(songId),
+        url_id: String(obj.url_id || songId),
+        lyric_id: String(obj.lyric_id || songId),
         source: source
       };
     }));
@@ -227,7 +227,7 @@ function normalizeJson(text, kind, source) {
 
   if (kind === "pic") {
     var album = payload && payload.album;
-    var cover = payload && (payload.cover || payload.pic || payload.picUrl || payload.picimg || payload.album_img || payload.albumImg || payload.albumPicUrl) || (album && (album.albumpic || album.album_img || album.albumImg || album.picUrl)) || "";
+    var cover = payload && (payload.url || payload.cover || payload.pic || payload.picUrl || payload.picimg || payload.album_img || payload.albumImg || payload.albumPicUrl) || (album && (album.albumpic || album.album_img || album.albumImg || album.picUrl)) || "";
     return JSON.stringify({ url: cover });
   }
 
@@ -300,11 +300,22 @@ async function findNeteaseArtwork(params, env, request) {
   searchParams.set("name", [name, artist].filter(Boolean).join(" "));
   searchParams.set("count", "8");
   searchParams.set("pages", "1");
-  var built = buildChKSzUrl(searchParams, env);
-  var response = await fetch(built.url, { headers: {
-    "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
-    "Accept": "application/json"
-  }});
+  // Try GDStudio first (free), fall back to ChKSz
+  var gdBuilt = buildGdStudioUrl(searchParams);
+  var response;
+  try {
+    response = await fetch(gdBuilt.url, { headers: {
+      "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+      "Accept": "application/json"
+    }});
+  } catch (_) { response = null; }
+  if (!response || !response.ok) {
+    var czBuilt = buildChKSzUrl(searchParams, env);
+    response = await fetch(czBuilt.url, { headers: {
+      "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+      "Accept": "application/json"
+    }});
+  }
   if (!response.ok) return "";
   var normalized = normalizeJson(await response.text(), "search", "netease");
   var songs;
@@ -313,22 +324,63 @@ async function findNeteaseArtwork(params, env, request) {
   return match ? match.picUrl : "";
 }
 
-async function proxyApiRequest(url, request, waitUntil, env) {
-  var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (url.searchParams.get("apikey") || "");
-  var imageMode = url.searchParams.get("format") === "image" && url.searchParams.get("types") === "pic";
-  if (!key) {
-    return new Response(JSON.stringify({ error: "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
+// ================= GDStudio API (free, no key needed) =================
+var GDSTUDIO_BASE = "https://music-api.gdstudio.xyz/api.php";
 
-  var built = buildChKSzUrl(url.searchParams, env);
-  var czUrl = built.url;
+function gdstudioCanHandle(params) {
+  var source = params.get("source") || "netease";
+  var types = params.get("types") || "search";
+  if (source !== "netease" && source !== "kuwo") return false;
+  return ["search", "url", "lyric", "pic", "playlist"].indexOf(types) > -1;
+}
+
+function buildGdStudioUrl(params) {
+  var u = new URL(GDSTUDIO_BASE);
+  var types = params.get("types") || "search";
+  var source = params.get("source") || "netease";
+  u.searchParams.set("types", types);
+  u.searchParams.set("source", source);
+  if (types === "search") {
+    u.searchParams.set("name", params.get("name") || params.get("keyword") || "");
+    u.searchParams.set("count", params.get("count") || "20");
+    u.searchParams.set("pages", params.get("pages") || "1");
+  } else {
+    u.searchParams.set("id", params.get("id") || params.get("lyric_id") || "");
+    if (types === "url") u.searchParams.set("br", params.get("br") || "320");
+  }
+  return { url: u.toString(), kind: types, source: source };
+}
+
+// Try GDStudio API. Returns { normalized } on success, null on failure.
+async function tryGdStudio(params, request) {
+  if (!gdstudioCanHandle(params)) return null;
+  try {
+    var built = buildGdStudioUrl(params);
+    var response = await fetch(built.url, { headers: {
+      "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+      "Accept": "application/json"
+    }});
+    if (!response.ok) return null;
+    var raw = await response.text();
+    if (!raw || raw.length < 2) return null;
+    var normalized = normalizeJson(raw, built.kind, built.source);
+    var parsed;
+    try { parsed = JSON.parse(normalized); } catch (_) { return null; }
+    if (parsed && parsed.error) return null;
+    if (parsed && typeof parsed.code === "number" && parsed.code !== 200 && parsed.code !== 0) return null;
+    return { normalized: normalized, kind: built.kind, source: built.source };
+  } catch (e) {
+    try { console.warn("GDStudio request failed, falling back to ChKSz:", e && e.message || e); } catch (_) {}
+    return null;
+  }
+}
+
+
+async function proxyApiRequest(url, request, waitUntil, env) {
+  var imageMode = url.searchParams.get("format") === "image" && url.searchParams.get("types") === "pic";
+
+  // --- Cache setup (shared by GDStudio and ChKSz backends) ---
   var cache = caches.default;
-  // Cache by the public proxy request, not only by the upstream URL. QQ/Kugou
-  // use one detail endpoint for URL, lyric and cover, but each proxy type has a
-  // different normalized response shape.
   var ck = new URL(url.toString());
   ck.searchParams.delete("apikey");
   ck.searchParams.delete("s");
@@ -346,6 +398,51 @@ async function proxyApiRequest(url, request, waitUntil, env) {
       })) });
     }
   }
+
+  // --- Try GDStudio API first (free, no key needed) for netease/kuwo ---
+  var gdResult = await tryGdStudio(url.searchParams, request);
+  if (gdResult) {
+    var gdNormalized = gdResult.normalized;
+    if (imageMode) {
+      var gdImg;
+      try { gdImg = JSON.parse(gdNormalized); } catch (_) { gdImg = {}; }
+      var gdImgUrl = gdImg && typeof gdImg.url === "string" ? gdImg.url : "";
+      if (!/^https?:\/\//i.test(gdImgUrl)) {
+        try { gdImgUrl = await findNeteaseArtwork(url.searchParams, env, request); }
+        catch (err) { try { console.warn("Artwork fallback failed", err); } catch (_) {} }
+      }
+      if (!gdImgUrl || !/^https?:\/\//i.test(gdImgUrl)) {
+        return new Response(JSON.stringify({ error: "封面地址为空", code: 404 }), { status: 404, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) });
+      }
+      var gdImgResp;
+      try { gdImgResp = await fetch(gdImgUrl, { headers: { "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0", "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" } }); }
+      catch (err) { return new Response(JSON.stringify({ error: "封面上游请求失败", detail: String(err && err.message || err) }), { status: 502, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) }); }
+      if (!gdImgResp.ok) return new Response(JSON.stringify({ error: "封面上游返回错误", code: gdImgResp.status }), { status: gdImgResp.status, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) });
+      var gdImgHdr = corsHeaders(new Headers({ "Content-Type": gdImgResp.headers.get("Content-Type") || "image/jpeg", "Cache-Control": "public, max-age=86400", "X-Cache-Status": "MISS", "X-Backend": "gdstudio" }));
+      if (!bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(gdImgResp.clone().body, { headers: gdImgHdr })));
+      return new Response(gdImgResp.body, { status: 200, headers: gdImgHdr });
+    }
+    var gdOutH = corsHeaders(new Headers({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+      "X-Cache-Status": "MISS",
+      "X-Backend": "gdstudio"
+    }));
+    if (!bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(gdNormalized, { headers: { "Content-Type": "application/json" } })));
+    return new Response(gdNormalized, { status: 200, headers: gdOutH });
+  }
+
+  // --- Fall back to ChKSz API ---
+  var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (url.searchParams.get("apikey") || "");
+  if (!key) {
+    return new Response(JSON.stringify({ error: "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+
+  var built = buildChKSzUrl(url.searchParams, env);
+  var czUrl = built.url;
 
   var upstream;
   try {
@@ -386,7 +483,8 @@ async function proxyApiRequest(url, request, waitUntil, env) {
   var outH = corsHeaders(new Headers({
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": (upstream.status === 200 && !bypass) ? "public, max-age=300" : "no-store",
-    "X-Cache-Status": "MISS"
+    "X-Cache-Status": "MISS",
+    "X-Backend": "chksz"
   }));
 
   if (upstream.status === 200 && !bypass && waitUntil) {

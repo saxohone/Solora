@@ -214,4 +214,9 @@
             }
         }
     }
+
+    // Expose for mobile-shell.js
+    window.openMobileSearch = openMobileSearchImpl;
+    window.openMobilePanel = openMobilePanelImpl;
+    window.closeAllMobileOverlays = closeAllMobileOverlaysImpl;
 })();

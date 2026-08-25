@@ -40,23 +40,14 @@
                 return;
             }
             document.documentElement.classList.add("mobile-view");
-            const link = document.createElement("link");
-            link.rel = "stylesheet";
-            link.href = "css/mobile.css?v=20260826-2";
-            link.id = "mobileStylesheet";
-            document.head.appendChild(link);
             const redesignLinkMobile = document.createElement("link");
             redesignLinkMobile.rel = "stylesheet";
             redesignLinkMobile.href = "css/redesign.css?v=20260826-5";
             redesignLinkMobile.id = "redesignStylesheet";
             document.head.appendChild(redesignLinkMobile);
-            const mobileFixesLink = document.createElement("link");
-            mobileFixesLink.rel = "stylesheet";
-            mobileFixesLink.href = "css/mobile-fixes.css?v=20260826-7";
-            document.head.appendChild(mobileFixesLink);
             const mobileShellLink = document.createElement("link");
             mobileShellLink.rel = "stylesheet";
-            mobileShellLink.href = "css/mobile-shell.css?v=20260826-1";
+            mobileShellLink.href = "css/mobile-shell.css?v=20260826-2";
             document.head.appendChild(mobileShellLink);
             const setViewportUnit = () => {
                 const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
@@ -582,9 +573,9 @@
 <script>
     if (window.__SOLARA_IS_MOBILE) {
         const mobileScript = document.createElement('script');
-        mobileScript.src = 'js/mobile.js?v=20260826-1';
+        mobileScript.src = 'js/mobile.js?v=20260826-3';
         const mobileShellScript = document.createElement('script');
-        mobileShellScript.src = 'js/mobile-shell.js?v=20260826-1';
+        mobileShellScript.src = 'js/mobile-shell.js?v=20260826-3';
         mobileShellScript.async = false;
         mobileShellScript.defer = false;
         document.body.appendChild(mobileShellScript);
