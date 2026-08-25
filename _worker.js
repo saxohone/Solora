@@ -94,7 +94,7 @@ function buildChKSzUrl(params, env) {
     if (source === "bugpk") {
       u = new URL((env && env.BUGPK_BASE_URL ? String(env.BUGPK_BASE_URL).replace(/\/+$/, "") : "https://api.bugpk.com") + "/api/163_music");
       u.searchParams.set("type", "search");
-      u.searchParams.set("s", kw);
+      u.searchParams.set("keywords", kw);
       u.searchParams.set("limit", String(count));
     } else if (source === "qq") {
       u = new URL(base + "/api/qq_music");
@@ -111,9 +111,15 @@ function buildChKSzUrl(params, env) {
       u.searchParams.set("offset", String(offset));
     }
   } else if (types === "playlist") {
-    if (source !== "netease") throw new Error("歌单读取目前仅支持网易云音乐");
-    u = new URL(base + "/api/163_playlist");
-    u.searchParams.set("id", id);
+    if (source === "bugpk") {
+      u = new URL((env && env.BUGPK_BASE_URL ? String(env.BUGPK_BASE_URL).replace(/\/+$/, "") : "https://api.bugpk.com") + "/api/163_music");
+      u.searchParams.set("type", "playlist");
+      u.searchParams.set("id", id);
+    } else {
+      if (source !== "netease") throw new Error("歌单读取目前仅支持网易云音乐");
+      u = new URL(base + "/api/163_playlist");
+      u.searchParams.set("id", id);
+    }
   } else if (types === "url" || types === "lyric" || types === "pic") {
     if (source === "bugpk") {
       u = new URL((env && env.BUGPK_BASE_URL ? String(env.BUGPK_BASE_URL).replace(/\/+$/, "") : "https://api.bugpk.com") + "/api/163_music");
@@ -151,6 +157,7 @@ function artistText(value) {
     return value.map(function (x) { return x && typeof x === "object" ? (x.name || x.singer || "") : String(x || ""); }).filter(Boolean).join(" / ");
   }
   if (value && typeof value === "object") return value.name || value.singer || "";
+  if (typeof value === "string") return value.split("/").map(function (s) { return s.trim(); }).filter(Boolean).join(" / ");
   return value ? String(value) : "";
 }
 
@@ -211,7 +218,7 @@ function normalizeJson(text, kind, source) {
         return {
           id: sid,
           name: obj.name || obj.title || "",
-          ar: names ? names.split(" / ").map(function (name) { return { name: name }; }) : [],
+          ar: names ? names.split("/").map(function (s) { return { name: s.trim() }; }).filter(function (s) { return s.name; }) : [],
           al: { name: albumText(obj.al || obj.album), picUrl: obj.cover || obj.picUrl || (obj.al && obj.al.picUrl) || "" }
         };
       })
