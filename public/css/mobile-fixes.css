@@ -286,3 +286,44 @@
   body.mobile-view .mobile-inline-lyrics__content > div, body.mobile-view .mobile-inline-lyrics__content div[data-index] { color: #aeb7c4 !important; opacity: 1 !important; }
   body.mobile-view .mobile-inline-lyrics__content .current { color: #f3a25b !important; font-weight: 700 !important; }
 }
+
+
+/* Keep playback timestamps visible beside the mobile seek bar. */
+@media (max-width: 820px) {
+  body.mobile-view .controls .progress-container {
+    display: grid !important;
+    grid-template-columns: 50px minmax(0, 1fr) 50px !important;
+    grid-template-rows: 32px auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 4px 8px !important;
+    align-items: center !important;
+  }
+  body.mobile-view .controls .progress-container input[type="range"] {
+    grid-column: 1 / 4 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 32px !important;
+    height: 32px !important;
+    margin: 0 !important;
+  }
+  body.mobile-view .controls .progress-container span,
+  body.mobile-view .controls .progress-container #currentTimeDisplay,
+  body.mobile-view .controls .progress-container #durationDisplay {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+    overflow: visible !important;
+    color: #aeb7c4 !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+    font-variant-numeric: tabular-nums !important;
+    white-space: nowrap !important;
+  }
+  body.mobile-view .controls .progress-container #currentTimeDisplay { grid-column: 1 !important; grid-row: 2 !important; text-align: left !important; }
+  body.mobile-view .controls .progress-container #durationDisplay { grid-column: 3 !important; grid-row: 2 !important; text-align: right !important; }
+}
