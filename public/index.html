@@ -54,6 +54,10 @@
             mobileFixesLink.rel = "stylesheet";
             mobileFixesLink.href = "css/mobile-fixes.css?v=20260826-7";
             document.head.appendChild(mobileFixesLink);
+            const mobileShellLink = document.createElement("link");
+            mobileShellLink.rel = "stylesheet";
+            mobileShellLink.href = "css/mobile-shell.css?v=20260826-1";
+            document.head.appendChild(mobileShellLink);
             const setViewportUnit = () => {
                 const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
                 document.documentElement.style.setProperty("--mobile-vh", `${viewportHeight}px`);
@@ -512,6 +516,15 @@
 
     <div class="mobile-overlay-scrim" id="mobileOverlayScrim"></div>
 
+    <div class="mobile-shell" id="mobileShell" aria-hidden="true">
+        <header class="mobile-shell__topbar"><button class="mobile-icon-button" id="mobileShellSettings" type="button" aria-label="打开设置"><i class="fas fa-gear"></i></button><h1 id="mobileShellTitle">首页</h1><button class="mobile-icon-button" id="mobileShellSearch" type="button" aria-label="打开搜索"><i class="fas fa-search"></i></button></header>
+        <main class="mobile-shell__content"><section class="mobile-home-view"><button class="mobile-home-hero" id="mobileHomePlayer" type="button" aria-label="打开完整播放器"><span class="mobile-home-hero__eyebrow">SOLARA PLAYER</span><strong id="mobileHomeSong">选择一首歌曲开始播放</strong><span id="mobileHomeArtist">未知艺术家</span><i class="fas fa-arrow-up-right-from-square"></i></button><button class="mobile-explore-card" id="mobileShellExplore" type="button"><i class="fas fa-satellite-dish"></i><span>探索雷达</span><small>发现新的音乐</small></button></section></main>
+        <button class="mobile-mini-player" id="mobileMiniPlayer" type="button" aria-label="打开完整播放器"><span class="mobile-mini-player__art" id="mobileMiniArtwork"><i class="fas fa-music"></i></span><span class="mobile-mini-player__meta"><strong id="mobileMiniTitle">选择一首歌曲</strong><small id="mobileMiniArtist">未知艺术家</small></span><i class="fas fa-play mobile-mini-player__play" id="mobileMiniPlayIcon"></i></button>
+        <nav class="mobile-bottom-nav" aria-label="主导航"><button class="is-active" type="button" data-mobile-nav="home"><i class="fas fa-house"></i><span>首页</span></button><button type="button" data-mobile-nav="search"><i class="fas fa-magnifying-glass"></i><span>搜索</span></button><button type="button" data-mobile-nav="favorites"><i class="fas fa-heart"></i><span>收藏</span></button><button type="button" data-mobile-nav="queue"><i class="fas fa-list"></i><span>队列</span></button><button type="button" data-mobile-nav="settings"><i class="fas fa-sliders"></i><span>设置</span></button></nav>
+        <section class="mobile-full-player" id="mobileFullPlayer" aria-hidden="true"><div class="mobile-full-player__bar"><button class="mobile-icon-button" id="mobileFullPlayerClose" type="button" aria-label="关闭播放器"><i class="fas fa-chevron-down"></i></button><span>正在播放</span><button class="mobile-icon-button" id="mobileFullPlayerMore" type="button" aria-label="歌曲操作"><i class="fas fa-ellipsis"></i></button></div><div class="mobile-full-player__body"><div class="mobile-full-player__art" id="mobileFullArtwork"><i class="fas fa-music"></i></div><strong id="mobileFullTitle">选择一首歌曲开始播放</strong><span id="mobileFullArtist">未知艺术家</span><button class="mobile-lyrics-entry" id="mobileLyricsEntry" type="button"><i class="fas fa-align-left"></i> 歌词</button></div><div class="mobile-full-player__controls"><div class="mobile-full-player__time"><span id="mobileFullCurrent">00:00</span><span id="mobileFullDuration">00:00</span></div><input id="mobileFullProgress" type="range" min="0" max="0" value="0" step="0.1"><div class="mobile-full-player__transport"><button id="mobileFullPrevious" type="button" aria-label="上一曲"><i class="fas fa-backward-step"></i></button><button class="is-primary" id="mobileFullPlay" type="button" aria-label="播放 / 暂停"><i class="fas fa-play"></i></button><button id="mobileFullNext" type="button" aria-label="下一曲"><i class="fas fa-forward-step"></i></button></div></div></section>
+        <section class="mobile-action-sheet" id="mobileActionSheet" aria-hidden="true"><div class="mobile-action-sheet__handle"></div><h2>歌曲操作</h2><button data-mobile-action="play"><i class="fas fa-play"></i>播放</button><button data-mobile-action="favorite"><i class="fas fa-heart"></i>收藏</button><button data-mobile-action="queue"><i class="fas fa-plus"></i>加入播放列表</button><button data-mobile-action="close"><i class="fas fa-xmark"></i>取消</button></section>
+    </div>
+
     <audio id="audioPlayer" preload="metadata" playsinline></audio>
 
 <!-- 设置模态框 -->
@@ -570,6 +583,11 @@
     if (window.__SOLARA_IS_MOBILE) {
         const mobileScript = document.createElement('script');
         mobileScript.src = 'js/mobile.js?v=20260826-1';
+        const mobileShellScript = document.createElement('script');
+        mobileShellScript.src = 'js/mobile-shell.js?v=20260826-1';
+        mobileShellScript.async = false;
+        mobileShellScript.defer = false;
+        document.body.appendChild(mobileShellScript);
         mobileScript.async = false;
         mobileScript.defer = false;
         document.body.appendChild(mobileScript);

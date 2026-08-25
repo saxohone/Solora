@@ -1027,6 +1027,8 @@ const state = {
     selectedSearchResults: new Set(),
 };
 
+window.SolaraState = state;
+
 let importSelectedMenuOutsideHandler = null;
 
 /**
