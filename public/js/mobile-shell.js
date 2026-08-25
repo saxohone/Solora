@@ -10,7 +10,7 @@
     var state = { activeView: "home", actionSong: null };
 
     var text = function (song) {
-        return Array.isArray(song && song.artist) ? song.artist.join(", ") : (song && song.artist) || "\u72ap\u77e\u8a7a\u72f5\u5b66";
+        return Array.isArray(song && song.artist) ? song.artist.join(", ") : (song && song.artist) || "\u672a\u77e5\u827a\u672f\u5bb6";
     };
     var current = function () { return window.SolaraState && window.SolaraState.currentSong; };
 
@@ -28,7 +28,7 @@
     function syncPlayer() {
         var song = current();
         if (!song) return;
-        var name = song.name || "\u900e\u62eb\u4ea5\u6b4c\u66b2";
+        var name = song.name || "\u672a\u77e5\u6b4c\u66f2";
         var artist = text(song);
         var els = [$("mobileHomeSong"), $("mobileMiniTitle"), $("mobileFullTitle")];
         for (var i = 0; i < els.length; i++) { if (els[i]) els[i].textContent = name; }
@@ -59,7 +59,7 @@
 
     function switchView(view) {
         state.activeView = view;
-        var labels = { home: "\u9996\u9875", search: "\u641c\u7d22", favorites: "\u6538\u85cf", queue: "\u961f\u5217", settings: "\u8bbe\u7f66" };
+        var labels = { home: "\u9996\u9875", search: "\u641c\u7d22", favorites: "\u6536\u85cf", queue: "\u961f\u5217", settings: "\u8bbe\u7f6e" };
         if ($("mobileShellTitle")) $("mobileShellTitle").textContent = labels[view] || "\u9996\u9875";
         var navs = document.querySelectorAll("[data-mobile-nav]");
         for (var i = 0; i < navs.length; i++) {
@@ -77,7 +77,7 @@
             if (window.openMobilePanel) window.openMobilePanel("favorites");
         } else if (view === "settings") {
             if (window.openSettingsModal) window.openSettingsModal();
-            var homeNav = document.querySelector('[data-mobile-nav="home"']);
+            var homeNav = document.querySelector('[data-mobile-nav="home"]');
             if (homeNav) homeNav.classList.add("is-active");
             var settingsNav = document.querySelector('[data-mobile-nav="settings"]');
             if (settingsNav) settingsNav.classList.remove("is-active");
