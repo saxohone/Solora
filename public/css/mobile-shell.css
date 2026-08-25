@@ -593,3 +593,130 @@ html.mobile-view .mobile-inline-lyrics { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
     .mobile-full-player, .mobile-action-sheet, .mobile-panel { transition: none; }
 }
+
+/* ============================================================
+ * Search result items (added by Catty fix)
+ * JS emits .search-result-item + children; legacy mobile.css no
+ * longer loads, so these were unstyled on mobile. Restore them
+ * with mobile-shell theme variables (auto light/dark).
+ * ============================================================ */
+html.mobile-view body > .search-area .search-result-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 12px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--line-soft, rgba(0,0,0,.055));
+    cursor: pointer;
+}
+html.mobile-view body > .search-area .search-result-item:active {
+    background: var(--component-bg, #f0f0f0);
+}
+html.mobile-view body > .search-area .search-result-item.selected {
+    background: color-mix(in srgb, var(--accent-color, #f3a25b) 12%, transparent);
+    border-radius: 10px;
+}
+
+/* Selection circle */
+html.mobile-view body > .search-area .search-result-select {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--line-strong, rgba(0,0,0,.2));
+    background: transparent;
+    color: transparent;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all .25s ease;
+    cursor: pointer;
+}
+html.mobile-view body > .search-area .search-result-item.selected .search-result-select {
+    background: var(--accent-color, #f3a25b);
+    border-color: var(--accent-color, #f3a25b);
+    color: #fff;
+}
+html.mobile-view body > .search-area .search-result-select i {
+    font-size: .7rem;
+    transform: scale(.5);
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+html.mobile-view body > .search-area .search-result-item.selected .search-result-select i {
+    transform: scale(1);
+}
+
+/* Text block */
+html.mobile-view body > .search-area .search-result-info { flex: 1; min-width: 0; }
+html.mobile-view body > .search-area .search-result-title {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 15px; font-weight: 500; color: var(--text-color, #262626);
+    margin-bottom: 2px;
+}
+html.mobile-view body > .search-area .search-result-item.selected .search-result-title {
+    color: var(--accent-color, #f3a25b);
+}
+html.mobile-view body > .search-area .search-result-artist {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13px; color: var(--text-secondary-color, #737373);
+}
+
+/* Cover inside result item */
+html.mobile-view body > .search-area .search-result-item .search-result-artwork {
+    width: 46px; height: 46px; border-radius: 8px; overflow: hidden;
+    background: var(--component-bg, #eaeaea);
+    display: grid; place-items: center; flex-shrink: 0; position: relative;
+}
+html.mobile-view body > .search-area .search-result-item .search-result-artwork-placeholder {
+    display: grid; place-items: center;
+    color: var(--text-secondary-color, #737373);
+}
+html.mobile-view body > .search-area .search-result-item .search-result-artwork-placeholder i {
+    font-size: 16px;
+}
+html.mobile-view body > .search-area .search-result-item .search-result-artwork-image {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    opacity: 0; transition: opacity .25s ease;
+}
+html.mobile-view body > .search-area .search-result-item .search-result-artwork.has-image .search-result-artwork-image {
+    opacity: 1;
+}
+html.mobile-view body > .search-area .search-result-item .search-result-artwork.has-image .search-result-artwork-placeholder {
+    visibility: hidden;
+}
+
+/* Action buttons (favorite / play / download) */
+html.mobile-view body > .search-area .search-result-actions {
+    display: flex; gap: 2px; flex-shrink: 0;
+}
+html.mobile-view body > .search-area .search-result-actions .action-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary-color, #737373);
+    display: flex; align-items: center; justify-content: center;
+    transition: color .2s ease, background .2s ease;
+}
+html.mobile-view body > .search-area .search-result-actions .action-btn:active {
+    background: var(--component-bg, #f0f0f0);
+    color: var(--text-color, #262626);
+}
+html.mobile-view body > .search-area .search-result-actions .action-btn.favorite.is-active {
+    color: #f36d6d;
+}
+
+/* Staggered entrance animation */
+@keyframes mobile-search-item-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+html.mobile-view body > .search-area .search-result-item {
+    animation: mobile-search-item-in .4s cubic-bezier(.22,1,.36,1) both;
+}
+html.mobile-view body > .search-area .search-result-item:nth-child(1){ animation-delay:.03s; }
+html.mobile-view body > .search-area .search-result-item:nth-child(2){ animation-delay:.06s; }
+html.mobile-view body > .search-area .search-result-item:nth-child(3){ animation-delay:.09s; }
+html.mobile-view body > .search-area .search-result-item:nth-child(4){ animation-delay:.12s; }
+html.mobile-view body > .search-area .search-result-item:nth-child(5){ animation-delay:.15s; }
+html.mobile-view body > .search-area .search-result-item:nth-child(n+6){ animation-delay:.18s; }
+
+@media (prefers-reduced-motion: reduce) {
+    html.mobile-view body > .search-area .search-result-item { animation: none; }
+}
