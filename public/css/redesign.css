@@ -274,8 +274,8 @@ body:not(.dark-mode) .background-stage__layer { filter: none; }
   font-weight: 800;
   letter-spacing: 1.6px;
 }
-.mobile-turntable { width: min(100%, 320px); }
-.mobile-turntable__platter { width: 100%; aspect-ratio: 1; }
+html.mobile-view .mobile-turntable { width: min(100%, 320px); }
+html.mobile-view .mobile-turntable__platter { width: 100%; aspect-ratio: 1; }
 .album-cover {
   position: relative;
   width: min(100%, 320px) !important;
@@ -298,7 +298,7 @@ body:not(.dark-mode) .background-stage__layer { filter: none; }
 .current-favorite-btn { color: var(--muted) !important; }
 .current-favorite-btn:hover, .current-favorite-btn.is-active { color: var(--alert) !important; }
 
-.mobile-panel { display: contents; }
+html.mobile-view .mobile-panel { display: contents; }
 .playlist, .favorites { padding: 72px 14px 14px !important; border-right: 1px solid var(--line) !important; }
 .playlist-header { top: 18px !important; left: 18px !important; right: 14px !important; }
 .playlist-tabs { gap: 2px !important; }

@@ -11,6 +11,13 @@ html.desktop-view .mobile-inline-lyrics {
     display: none;
 }
 
+/* Turntable wrapper and platter: transparent pass-through on desktop
+   so the shared .album-cover renders as a direct child of .cover-area */
+html.desktop-view .mobile-turntable,
+html.desktop-view .mobile-turntable__platter {
+    display: contents;
+}
+
 /* Remove circular decoration from playlist action buttons on desktop */
 html.desktop-view .playlist-action-btn {
     width: auto;

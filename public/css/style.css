@@ -2194,11 +2194,11 @@ input[type="range"]:active::-moz-range-thumb {
     display: none;
 }
 
-.mobile-panel {
+html.mobile-view .mobile-panel {
     display: contents;
 }
 
-.mobile-turntable {
+html.mobile-view .mobile-turntable {
     width: 100%;
     display: flex;
     align-items: center;
@@ -2207,7 +2207,7 @@ input[type="range"]:active::-moz-range-thumb {
     margin-bottom: 15px;
 }
 
-.mobile-turntable__platter {
+html.mobile-view .mobile-turntable__platter {
     position: relative;
     display: flex;
     align-items: center;
@@ -2413,4 +2413,32 @@ input[type="range"]:active::-moz-range-thumb {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* =====================================================================
+   Mobile-shell visibility guard (GLOBAL)
+   ---------------------------------------------------------------------
+   .mobile-shell.css 只在移动端被加载，桌面端不会引入其中的
+   ".mobile-shell{display:none}" 规则，导致移动 UI 漏到桌面端。
+   因此这条全局守卫必须放在所有视口都会加载的 style.css 中。
+   ===================================================================== */
+html:not(.mobile-view) .mobile-shell,
+html:not(.mobile-view) .mobile-shell * {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* ===================================================================
+   桌面端守卫：旧移动 UI（散落在 .container 内的 mobile 元素）
+   .mobile-turntable 和 .mobile-turntable__platter 包裹着共享的
+   .album-cover，桌面端用 display: contents 透传，让 album-cover
+   直接作为 .cover-area 的 flex 子元素正常显示。
+   =================================================================== */
+html:not(.mobile-view) .mobile-turntable,
+html:not(.mobile-view) .mobile-turntable__platter {
+    display: contents !important;
+}
+html:not(.mobile-view) .mobile-panel {
+    display: contents !important;
 }
