@@ -3742,6 +3742,17 @@ function setupInteractions() {
         }
     });
 
+    // 兼容手机端：部分移动端浏览器/输入法（尤其 iOS 中文）回车触发 keydown 而非 keypress，
+    // 若仅靠 keypress，手机端搜索将无法提交。此处用 keydown 兜底，并防重复触发。
+    dom.searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            debugLog("搜索输入框回车键(keydown)被按下");
+            performSearch();
+        }
+    });
+
     updateImportSelectedButton();
 
     // 修复：点击搜索区域外部时隐藏搜索结果
