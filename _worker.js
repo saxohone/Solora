@@ -228,8 +228,12 @@ function normalizeJson(text, kind, source) {
     if (Array.isArray(payload)) payload = payload[0] || {};
     if (typeof payload === "string") return JSON.stringify({ url: payload });
     payload = payload || {};
+    var resolvedUrl = payload.url || payload.playUrl || payload.play_url || payload.src || payload.url320 || payload.url128 || "";
+    if (/music\.163\.com\/song\/media\/outer\/url/i.test(String(resolvedUrl))) {
+      return JSON.stringify({ url: "", error: "该音源返回的播放地址已失效（网易云 404）" });
+    }
     return JSON.stringify({
-      url: payload.url || payload.playUrl || payload.play_url || payload.src || payload.url320 || payload.url128 || "",
+      url: resolvedUrl,
       cover: payload.cover || payload.pic || payload.picUrl || "",
       name: payload.name || "",
       artist: artistText(payload.singer || payload.artist || payload.artists),

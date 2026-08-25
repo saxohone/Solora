@@ -5687,7 +5687,7 @@ async function playSong(song, options = {}) {
         const audioData = await API.fetchJson(audioUrl);
 
         if (!audioData || !audioData.url) {
-            throw new Error('无法获取音频播放地址');
+            throw new Error(audioData && audioData.error ? audioData.error : '无法获取音频播放地址');
         }
 
         if (!song.picUrl && typeof audioData.cover === "string" && audioData.cover.startsWith("http")) {
@@ -5814,10 +5814,14 @@ async function playSong(song, options = {}) {
         }
     } catch (error) {
         console.error('播放歌曲失败:', error);
-        if (!isRetry) {
-            debugLog('播放歌曲失败，尝试刷新缓存重试...', error);
-            return playSong(song, { ...options, isRetry: true });
-        }
+        dom.audioPlayer.pause();
+        dom.audioPlayer.removeAttribute('src');
+        dom.audioPlayer.load();
+        state.currentAudioUrl = null;
+        updatePlayPauseButton();
+        const message = error && error.message ? error.message : '播放失败，请检查网络连接';
+        debugLog(`播放失败: ${message}`);
+        showNotification(message, 'error');
         throw error;
     } finally {
         savePlayerState();
