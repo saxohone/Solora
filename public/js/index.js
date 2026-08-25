@@ -2367,19 +2367,8 @@ function saveFavoriteState(options = {}) {
 // 调试日志函数
 function debugLog(message) {
     console.log(`[DEBUG] ${message}`);
-    if (state.debugMode) {
-        const debugInfo = dom.debugInfo;
-        const entry = document.createElement("div");
-        entry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-        debugInfo.appendChild(entry);
-
-        while (debugInfo.childNodes.length > 50) {
-            debugInfo.removeChild(debugInfo.firstChild);
-        }
-
-        debugInfo.classList.add("show");
-        debugInfo.scrollTop = debugInfo.scrollHeight;
-    }
+    // Keep diagnostics in the console so the debug container cannot leak into the UI.
+    return;
 }
 
 // 启用调试模式（按Ctrl+D）
@@ -2387,12 +2376,9 @@ document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.key === "d") {
         e.preventDefault();
         state.debugMode = !state.debugMode;
-        if (state.debugMode) {
-            dom.debugInfo.classList.add("show");
-            debugLog("调试模式已启用");
-        } else {
-            dom.debugInfo.classList.remove("show");
-        }
+        dom.debugInfo.classList.remove("show");
+        dom.debugInfo.setAttribute("aria-hidden", "true");
+        if (state.debugMode) debugLog("调试模式已启用");
     }
 });
 
@@ -2407,7 +2393,6 @@ function toggleSearchMode(enable) {
         debugLog("退出搜索模式");
     }
 }
-
 // 新增：显示搜索结果
 function showSearchResults(options = {}) {
     const { restore = false } = options;

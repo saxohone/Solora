@@ -1,6 +1,19 @@
 /* Mobile application shell. The existing desktop player remains the source of truth for playback. */
 html.mobile-view .mobile-shell { display: block; }
 .mobile-shell { display: none; }
+/* Hidden mobile overlays must never leak their text into the visual tree. */
+.mobile-full-player[aria-hidden="true"],
+.mobile-action-sheet[aria-hidden="true"],
+.mobile-overlay-scrim[aria-hidden="true"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+html.mobile-view .debug-info,
+#debugInfo[aria-hidden="true"] {
+    display: none !important;
+    visibility: hidden !important;
+}
 html.mobile-view body { background: #f5f6f8; }
 html.mobile-view .mobile-shell { position: fixed; inset: 0; z-index: 30; min-height: 100dvh; padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left)); color: #191b20; pointer-events: none; }
 html.mobile-view .mobile-shell > * { pointer-events: auto; }

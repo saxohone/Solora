@@ -516,7 +516,7 @@
 
     <div class="mobile-overlay-scrim" id="mobileOverlayScrim"></div>
 
-    <div class="mobile-shell" id="mobileShell" aria-hidden="true">
+    <div class="mobile-shell" id="mobileShell" aria-hidden="false">
         <header class="mobile-shell__topbar"><button class="mobile-icon-button" id="mobileShellSettings" type="button" aria-label="打开设置"><i class="fas fa-gear"></i></button><h1 id="mobileShellTitle">首页</h1><button class="mobile-icon-button" id="mobileShellSearch" type="button" aria-label="打开搜索"><i class="fas fa-search"></i></button></header>
         <main class="mobile-shell__content"><section class="mobile-home-view"><button class="mobile-home-hero" id="mobileHomePlayer" type="button" aria-label="打开完整播放器"><span class="mobile-home-hero__eyebrow">SOLARA PLAYER</span><strong id="mobileHomeSong">选择一首歌曲开始播放</strong><span id="mobileHomeArtist">未知艺术家</span><i class="fas fa-arrow-up-right-from-square"></i></button><button class="mobile-explore-card" id="mobileShellExplore" type="button"><i class="fas fa-satellite-dish"></i><span>探索雷达</span><small>发现新的音乐</small></button></section></main>
         <button class="mobile-mini-player" id="mobileMiniPlayer" type="button" aria-label="打开完整播放器"><span class="mobile-mini-player__art" id="mobileMiniArtwork"><i class="fas fa-music"></i></span><span class="mobile-mini-player__meta"><strong id="mobileMiniTitle">选择一首歌曲</strong><small id="mobileMiniArtist">未知艺术家</small></span><i class="fas fa-play mobile-mini-player__play" id="mobileMiniPlayIcon"></i></button>
@@ -575,7 +575,7 @@
 <div id="notification" class="notification"></div>
 
 <!-- 调试信息容器 -->
-<div id="debugInfo" class="debug-info"></div>
+<div id="debugInfo" class="debug-info" aria-hidden="true"></div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="js/index.js?v=20260826-5"></script>

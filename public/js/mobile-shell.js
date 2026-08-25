@@ -4,6 +4,7 @@
     const body = document.body;
     const shell = $("mobileShell");
     if (!shell) return;
+    shell.setAttribute("aria-hidden", "false");
     const state = { activeView: "home", actionSong: null };
     const text = (song) => Array.isArray(song && song.artist) ? song.artist.join(", ") : (song && song.artist) || "未知艺术家";
     const current = () => window.SolaraState && window.SolaraState.currentSong;
