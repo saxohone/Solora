@@ -152,6 +152,35 @@ function buildChKSzUrl(params, env) {
   return { url: u.toString(), kind: types, source: source };
 }
 
+// Build a BugPK fallback built descriptor (free, keyless) for Netease content.
+// Mirrors the source==="bugpk" branches inside buildChKSzUrl so a ChKSz failure
+// or a missing API_KEY can transparently fall back to Bugpk without a key.
+function buildBugpkBuilt(params, env) {
+  var base = (env && env.BUGPK_BASE_URL ? String(env.BUGPK_BASE_URL).replace(/\/+$/, "") : "https://api.bugpk.com") + "/api/163_music";
+  var types = params.get("types") || "search";
+  var id = params.get("id") || "";
+  var br = params.get("br") || "320";
+  var u = new URL(base);
+  if (types === "search") {
+    var kw = params.get("name") || params.get("keyword") || "";
+    var count = Math.max(1, Math.min(50, parseInt(params.get("count") || "20", 10) || 20));
+    u.searchParams.set("type", "search");
+    u.searchParams.set("keywords", kw);
+    u.searchParams.set("limit", String(count));
+  } else if (types === "playlist") {
+    u.searchParams.set("type", "playlist");
+    u.searchParams.set("id", id);
+  } else if (types === "url" || types === "lyric" || types === "pic") {
+    u.searchParams.set("id", id);
+    u.searchParams.set("type", types === "lyric" ? "lyric" : (types === "pic" ? "song" : "url"));
+    if (types === "url") u.searchParams.set("level", mapBrToLevel(br));
+  } else {
+    throw new Error("不支持的代理类型(参考): " + types);
+  }
+  return { url: u.toString(), kind: types, source: "bugpk" };
+}
+
+
 function artistText(value) {
   if (Array.isArray(value)) {
     return value.map(function (x) { return x && typeof x === "object" ? (x.name || x.singer || "") : String(x || ""); }).filter(Boolean).join(" / ");
@@ -483,72 +512,84 @@ async function proxyApiRequest(url, request, waitUntil, env) {
     return new Response(gdNormalized, { status: 200, headers: gdOutH });
   }
 
-  // --- Fall back to ChKSz API ---
+  // --- Fall back to ChKSz API; Netease additionally falls back to free Bugpk ---
   var key = (env && env.API_KEY && String(env.API_KEY).trim()) ? String(env.API_KEY).trim() : (url.searchParams.get("apikey") || "");
+  var isNetease = normalizeProvider(url.searchParams.get("source") || "netease") === "netease";
+
+  async function runBackend(built, backendName) {
+    var resp;
+    try {
+      resp = await fetch(built.url, { headers: {
+        "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+        "Accept": "application/json"
+      }});
+    } catch (e) {
+      return { unwrapped: JSON.stringify({ error: "upstream error: " + (e && e.message || e) }), status: 502, outH: null, ok: false };
+    }
+    var raw = await resp.text();
+    var unwrapped = normalizeJson(raw, built.kind, built.source);
+    if (imageMode) {
+      var imageData;
+      try { imageData = JSON.parse(unwrapped); } catch (_) { imageData = {}; }
+      var imageUrl = imageData && typeof imageData.url === "string" ? imageData.url : "";
+      if (!/^https?:\/\//i.test(imageUrl)) {
+        try { imageUrl = await findNeteaseArtwork(url.searchParams, env, request); }
+        catch (error) { try { console.warn("Netease artwork fallback failed", error); } catch (_) {} }
+      }
+      if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
+        return { unwrapped: JSON.stringify({ error: "封面地址为空", code: 404 }), status: 404, outH: null, ok: false };
+      }
+      var imageResponse;
+      try { imageResponse = await fetch(imageUrl, { headers: { "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0", "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" } }); }
+      catch (error) { return { unwrapped: JSON.stringify({ error: "封面上游请求失败", detail: String(error && error.message || error) }), status: 502, outH: null, ok: false }; }
+      if (!imageResponse.ok) return { unwrapped: JSON.stringify({ error: "封面上游返回错误", code: imageResponse.status }), status: imageResponse.status, outH: null, ok: false };
+      var imageHeaders = corsHeaders(new Headers({ "Content-Type": imageResponse.headers.get("Content-Type") || "image/jpeg", "Cache-Control": "public, max-age=86400", "X-Cache-Status": "MISS" }));
+      if (!bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(imageResponse.clone().body, { headers: imageHeaders })));
+      return { imageBody: imageResponse.body, imageHeaders: imageHeaders, ok: true };
+    }
+    var status = resp.status >= 200 && resp.status < 500 ? resp.status : 200;
+    var failed = resp.status === 401 || resp.status === 402 || resp.status === 403 || resp.status === 429;
+    if (!failed) {
+      try {
+        var probe = JSON.parse(unwrapped);
+        if (probe && typeof probe === "object" && (probe.error || (probe.url !== undefined && !probe.url))) failed = true;
+      } catch (_) {}
+    }
+    var outH = corsHeaders(new Headers({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": (resp.status === 200 && !bypass) ? "public, max-age=300" : "no-store",
+      "X-Cache-Status": "MISS",
+      "X-Backend": backendName
+    }));
+    if (!failed && resp.status === 200 && !bypass && waitUntil) {
+      waitUntil(cache.put(cacheKey, new Response(unwrapped, { headers: { "Content-Type": "application/json" } })));
+    }
+    return { unwrapped: unwrapped, status: status, outH: outH, ok: !failed };
+  }
+
+  var built, backendName;
   if (!key) {
-    return new Response(JSON.stringify({ error: gdQuotaMsg || "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key", code: gdQuotaMsg ? 402 : 401, gd_quota: !!gdQuotaMsg }), {
-      status: gdQuotaMsg ? 402 : 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
-  var built = buildChKSzUrl(url.searchParams, env);
-  var czUrl = built.url;
-
-  var upstream;
-  try {
-    upstream = await fetch(czUrl, { headers: {
-      "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
-      "Accept": "application/json"
-    }});
-  } catch (e) {
-    return new Response(JSON.stringify({ error: "upstream error: " + (e && e.message || e) }), {
-      status: 502,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
-  var raw = await upstream.text();
-  var kind = built.kind;
-  var unwrapped = normalizeJson(raw, kind, built.source);
-  if (imageMode) {
-    var imageData;
-    try { imageData = JSON.parse(unwrapped); } catch (_) { imageData = {}; }
-    var imageUrl = imageData && typeof imageData.url === "string" ? imageData.url : "";
-    if (!/^https?:\/\//i.test(imageUrl)) {
-      try { imageUrl = await findNeteaseArtwork(url.searchParams, env, request); }
-      catch (error) { try { console.warn("Netease artwork fallback failed", error); } catch (_) {} }
+    if (isNetease) {
+      built = buildBugpkBuilt(url.searchParams, env);
+      backendName = "bugpk";
+    } else {
+      return new Response(JSON.stringify({ error: gdQuotaMsg || "API_KEY 未配置：请在 Cloudflare 环境变量中设置 ChKSz API Key", code: gdQuotaMsg ? 402 : 401, gd_quota: !!gdQuotaMsg }), {
+        status: gdQuotaMsg ? 402 : 401,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
     }
-    if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
-      return new Response(JSON.stringify({ error: "封面地址为空", code: 404 }), { status: 404, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) });
-    }
-    var imageResponse;
-    try { imageResponse = await fetch(imageUrl, { headers: { "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0", "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" } }); }
-    catch (error) { return new Response(JSON.stringify({ error: "封面上游请求失败", detail: String(error && error.message || error) }), { status: 502, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) }); }
-    if (!imageResponse.ok) return new Response(JSON.stringify({ error: "封面上游返回错误", code: imageResponse.status }), { status: imageResponse.status, headers: corsHeaders(new Headers({ "Content-Type": "application/json" })) });
-    var imageHeaders = corsHeaders(new Headers({ "Content-Type": imageResponse.headers.get("Content-Type") || "image/jpeg", "Cache-Control": "public, max-age=86400", "X-Cache-Status": "MISS" }));
-    if (!bypass && waitUntil) waitUntil(cache.put(cacheKey, new Response(imageResponse.clone().body, { headers: imageHeaders })));
-    return new Response(imageResponse.body, { status: 200, headers: imageHeaders });
+  } else {
+    built = buildChKSzUrl(url.searchParams, env);
+    backendName = built.source === "bugpk" ? "bugpk" : "chksz";
   }
-  var status = upstream.status >= 200 && upstream.status < 500 ? upstream.status : 200;
-  var outH = corsHeaders(new Headers({
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": (upstream.status === 200 && !bypass) ? "public, max-age=300" : "no-store",
-    "X-Cache-Status": "MISS",
-    "X-Backend": "chksz"
-  }));
 
-  // Never cache failed/dead responses so an error (e.g. netease outer/url 404)
-  // is not served repeatedly for 300s.
-  var czCacheable = true;
-  try {
-    var czProbe = JSON.parse(unwrapped);
-    if (czProbe && typeof czProbe === "object" && (czProbe.error || (czProbe.url !== undefined && !czProbe.url))) czCacheable = false;
-  } catch (_) {}
-  if (czCacheable && upstream.status === 200 && !bypass && waitUntil) {
-    waitUntil(cache.put(cacheKey, new Response(unwrapped, { headers: { "Content-Type": "application/json" } })));
+  var out = await runBackend(built, backendName);
+  if (!out.ok && isNetease && backendName === "chksz") {
+    out = await runBackend(buildBugpkBuilt(url.searchParams, env), "bugpk");
   }
-  return new Response(unwrapped, { status: status, headers: outH });
+  if (out.imageBody) return new Response(out.imageBody, { status: 200, headers: out.imageHeaders });
+  var fallbackHeaders = out.outH || { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+  return new Response(out.unwrapped, { status: out.status, headers: fallbackHeaders });
 }
 
 // Entry point
