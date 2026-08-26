@@ -40,11 +40,6 @@
                 return;
             }
             document.documentElement.classList.add("mobile-view");
-            const redesignLinkMobile = document.createElement("link");
-            redesignLinkMobile.rel = "stylesheet";
-            redesignLinkMobile.href = "css/redesign.css?v=20260826-5";
-            redesignLinkMobile.id = "redesignStylesheet";
-            document.head.appendChild(redesignLinkMobile);
             const mobileCssLink = document.createElement("link");
             mobileCssLink.rel = "stylesheet";
             mobileCssLink.href = "css/mobile.css?v=20260826-1";
