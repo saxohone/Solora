@@ -4125,23 +4125,6 @@ function createSearchResultItem(song, index) {
     item.className = "search-result-item";
     item.dataset.index = String(index);
 
-    const artwork = document.createElement("div");
-    artwork.className = "search-result-artwork";
-    artwork.setAttribute("aria-hidden", "true");
-    const artworkPlaceholder = document.createElement("span");
-    artworkPlaceholder.className = "search-result-artwork-placeholder";
-    artworkPlaceholder.innerHTML = '<i class="fas fa-music"></i>';
-    artwork.appendChild(artworkPlaceholder);
-    const artworkImage = document.createElement("img");
-    artworkImage.className = "search-result-artwork-image";
-    artworkImage.alt = "";
-    artworkImage.loading = "lazy";
-    artworkImage.decoding = "async";
-    artworkImage.addEventListener("load", () => artwork.classList.add("has-image"));
-    artworkImage.addEventListener("error", () => artwork.classList.remove("has-image"), { once: true });
-    artworkImage.src = API.getPicUrl(song) + "&format=image";
-    artwork.appendChild(artworkImage);
-
     const selectionToggle = document.createElement("button");
     selectionToggle.className = "search-result-select";
     selectionToggle.type = "button";
@@ -4207,7 +4190,6 @@ function createSearchResultItem(song, index) {
     actions.appendChild(downloadButton);
 
     item.appendChild(selectionToggle);
-    item.appendChild(artwork);
     item.appendChild(info);
     item.appendChild(actions);
 
